@@ -1,0 +1,44 @@
+name: LowkPad
+
+options:
+  bundleIdPrefix: com.lowk
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+targets:
+  LowkPad:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: LowkPad
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Desde iOS 14, hablar con una IP de tu propia red exige este permiso.
+        NSLocalNetworkUsageDescription:
+          LowkPad se conecta con el programa que corre en tu PC dentro de tu red local.
+        NSMotionUsageDescription:
+          El acelerómetro se usa para detectar el golpecito en la trasera del móvil
+          y convertirlo en un clic.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lowk.lowkpad
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        ENABLE_BITCODE: NO

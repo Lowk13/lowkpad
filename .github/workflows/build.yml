@@ -1,0 +1,67 @@
+name: Compilar LowkPad
+
+# Se lanza a mano desde la pestaña Actions, o solo con subir cambios.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      - name: Generar el proyecto de Xcode
+        run: xcodegen generate
+
+      - name: Compilar
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project LowkPad.xcodeproj \
+            -target LowkPad \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build
+
+      # LiveContainer no necesita firma: le vale el .app crudo dentro de un .ipa.
+      - name: Empaquetar el .ipa
+        run: |
+          APP="build/Build/Products/Release-iphoneos/LowkPad.app"
+          test -d "$APP" || { echo "No se generó el .app"; ls -R build/Build/Products || true; exit 1; }
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry LowkPad.ipa Payload
+          ls -lh LowkPad.ipa
+
+      - name: Guardar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: LowkPad-ipa
+          path: LowkPad.ipa
+
+      # Además se publica en una release fija, para poder descargarla desde el
+      # propio iPhone con un enlace directo (los artefactos van en zip y piden
+      # sesión iniciada; esto no).
+      - name: Publicar la última versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ultima --yes --cleanup-tag 2>/dev/null || true
+          gh release create ultima LowkPad.ipa \
+            --title "Última compilación" \
+            --notes "Compilado desde $GITHUB_SHA. Descarga el .ipa desde el iPhone y ábrelo con LiveContainer."
