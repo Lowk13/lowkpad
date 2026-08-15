@@ -87,18 +87,21 @@ final class Enlace {
     private func recibir() {
         conexion?.receiveMessage { [weak self] datos, _, _, _ in
             guard let self else { return }
-            if let datos, let texto = String(data: datos, encoding: .utf8),
-               texto.contains("\"pong\"") {
-                // el eco trae de vuelta la marca de tiempo que mandamos
-                if let r = texto.range(of: "\"p\":"),
-                   let valor = Int(texto[r.upperBound...].prefix(while: { $0.isNumber })) {
-                    let ida = Double(self.ms - valor)
-                    self.ultimoPong = CFAbsoluteTimeGetCurrent()
-                    self.muestras.append(ida)
-                    if self.muestras.count > 15 { self.muestras.removeFirst() }
-                    let ordenadas = self.muestras.sorted()
-                    self.latencia = ordenadas[ordenadas.count / 2]
-                }
+            // Se interpreta como JSON de verdad y no buscando trozos de texto:
+            // la versión anterior buscaba `"p":` y leía cifras justo detrás, pero
+            // Python escribe `"p": 123` CON espacio, así que no leía nada y
+            // descartaba todos los pongs. Resultado: la app decía "sin respuesta"
+            // mientras el PC contestaba perfectamente.
+            if let datos,
+               let obj = try? JSONSerialization.jsonObject(with: datos) as? [String: Any],
+               obj["t"] as? String == "pong",
+               let valor = obj["p"] as? Int {
+                let ida = Double(self.ms - valor)
+                self.ultimoPong = CFAbsoluteTimeGetCurrent()
+                self.muestras.append(ida)
+                if self.muestras.count > 15 { self.muestras.removeFirst() }
+                let ordenadas = self.muestras.sorted()
+                self.latencia = ordenadas[ordenadas.count / 2]
             }
             if self.conexion != nil { self.recibir() }
         }
