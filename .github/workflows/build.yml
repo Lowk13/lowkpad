@@ -21,14 +21,16 @@ jobs:
         run: brew install xcodegen
 
       - name: Generar el proyecto de Xcode
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          xcodebuild -list -project LowkPad.xcodeproj
 
       - name: Compilar
         run: |
           set -o pipefail
           xcodebuild \
             -project LowkPad.xcodeproj \
-            -target LowkPad \
+            -scheme LowkPad \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \

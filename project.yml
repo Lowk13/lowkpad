@@ -42,3 +42,15 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
         ENABLE_BITCODE: NO
+
+# Se declara el esquema a mano para no depender de lo que XcodeGen genere solo:
+# xcodebuild exige -scheme en cuanto usas -derivedDataPath.
+schemes:
+  LowkPad:
+    build:
+      targets:
+        LowkPad: all
+    run:
+      config: Release
+    archive:
+      config: Release
