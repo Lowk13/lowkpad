@@ -71,12 +71,14 @@ final class PantallaAjustes: UIViewController {
 
         titulo("Clic a una mano")
         interruptor("Golpecito en la trasera", { self.a.golpecito }, { self.a.golpecito = $0 })
-        deslizador("· fuerza necesaria", 0.6, 3.5, { self.a.umbralGolpe }, { self.a.umbralGolpe = $0 }) {
+        deslizador("· sensibilidad (brusquedad)", 0.08, 1.5, { self.a.umbralGolpe }, { self.a.umbralGolpe = $0 }) {
             String(format: "%.2f", $0)
         }
         interruptor("· que sea clic derecho", { self.a.golpeDerecho }, { self.a.golpeDerecho = $0 })
-        nota("En la pantalla principal verás «golpe» con la fuerza del último pico. Da un golpecito "
-             + "normal, mira qué número sale y pon el umbral algo por debajo. Si te saltan clics solos, súbelo.")
+        nota("Ahora detecta lo BRUSCO del golpe, no lo fuerte: sujetando el móvil con una mano, "
+             + "tu propia mano amortigua el golpe y por fuerza nunca llegaba. En la pantalla principal "
+             + "sale «tiron» con el pico. Da un golpecito flojito, mira qué marca y pon el umbral "
+             + "algo por debajo.")
 
         interruptor("Botones de volumen", { self.a.volumen }, { self.a.volumen = $0 })
         interruptor("· intercambiar izquierdo y derecho", { self.a.volumenInvertido }, { self.a.volumenInvertido = $0 })
@@ -91,17 +93,18 @@ final class PantallaAjustes: UIViewController {
         interruptor("Dos dedos = clic derecho", { self.a.dosDedosDerecho }, { self.a.dosDedosDerecho = $0 })
         nota("Si dejas el segundo dedo apoyado, el botón se queda pulsado: así se arrastra sin levantar nada.")
 
-        titulo("Experimento: presión por huella")
-        interruptor("Apretar para hacer clic", { self.a.presion }, { self.a.presion = $0 })
-        deslizador("· umbral de clic", 1.05, 1.8, { self.a.presionAbajo }, { self.a.presionAbajo = $0 }) {
+        titulo("Clic apoyando el pulgar")
+        interruptor("Apoyar el pulgar = clic", { self.a.presion }, { self.a.presion = $0 })
+        deslizador("· cuánto hay que apoyar", 1.15, 2.5, { self.a.presionAbajo }, { self.a.presionAbajo = $0 }) {
             String(format: "x%.2f", $0)
         }
-        deslizador("· umbral de soltar", 1.01, 1.6, { self.a.presionArriba }, { self.a.presionArriba = $0 }) {
+        deslizador("· cuándo se suelta", 1.05, 2.0, { self.a.presionArriba }, { self.a.presionArriba = $0 }) {
             String(format: "x%.2f", $0)
         }
-        nota("En Safari este dato venía siempre fijo y el método quedó descartado. Aquí se lee de otra "
-             + "fuente distinta. Mira el número «huella» en la pantalla principal: si no se mueve al "
-             + "apretar, tampoco sirve en nativo.")
+        nota("No es apretar más fuerte (eso cambia la huella un 20 % y se pierde en el ruido): es pasar "
+             + "de apuntar con la PUNTA del pulgar a apoyarlo PLANO, que la cambia al doble. Arriba "
+             + "sale «huella actual/mínima x factor»: apoya el pulgar plano, mira hasta dónde sube el "
+             + "factor y pon el umbral por debajo de ese máximo.")
 
         titulo("Pantalla y tacto")
         interruptor("Vibración al hacer clic", { self.a.haptico }, { self.a.haptico = $0 })

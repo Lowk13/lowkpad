@@ -6,7 +6,7 @@ protocol TrackpadDelegado: AnyObject {
     func trackpadBoton(_ cual: String, pulsado: Bool)
     func trackpadClic(_ cual: String)
     func trackpadNota(_ texto: String, derecho: Bool)
-    func trackpadHuella(_ radio: Double, base: Double)
+    func trackpadHuella(_ radio: Double, base: Double, minimo: Double, maximo: Double)
 }
 
 /// La superficie táctil.
@@ -41,6 +41,8 @@ final class Trackpad: UIView {
     private var apretando = false
     private var baseHuella: Double = 0
     private var muestrasHuella: [Double] = []
+    private var radioMin: Double = 0
+    private var radioMax: Double = 0
 
     private var secundarios: [ObjectIdentifier: Secundario] = [:]
     private var tareaLarga: DispatchWorkItem?
@@ -240,30 +242,52 @@ final class Trackpad: UIView {
 
     // MARK: - el experimento de la presión
 
+    /// Clic **apoyando el pulgar plano**.
+    ///
     /// El iPhone 13 no tiene sensor de fuerza, pero sí da el tamaño de la huella
-    /// del dedo, que crece al apretar. En Safari este dato venía siempre fijo;
-    /// aquí usamos `majorRadius`, que es otra fuente distinta. Puede funcionar
-    /// o no: por eso se muestra en pantalla en crudo.
+    /// (`majorRadius`). Apretar más fuerte cambia esa huella un 20 % y con un
+    /// sensor tosco eso se pierde en el ruido. En cambio, pasar de apuntar con
+    /// la **punta** del pulgar a apoyarlo **plano** la cambia al doble o más:
+    /// una señal enorme, imposible de confundir, y un gesto que se hace con la
+    /// misma mano que sujeta el móvil sin levantar el dedo.
+    ///
+    /// La referencia es el **mínimo** que se ha visto (el pulgar de punta), no
+    /// las primeras muestras: así da igual si empiezas ya con el dedo apoyado.
+    /// Baja al instante y sube muy despacio, para que la referencia se recupere
+    /// si cambias de postura pero no la arrastre un apoyo mantenido.
     private func medirHuella(_ t: UITouch) {
         let r = Double(t.majorRadius)
-        delegado?.trackpadHuella(r, base: baseHuella)
-        guard Ajustes.compartidos.presion, r > 0 else { return }
+        guard r > 0 else { return }
 
+        if baseHuella == 0 { baseHuella = r }
+        if r < baseHuella { baseHuella = r }
+        else { baseHuella += (r - baseHuella) * 0.0008 }
+
+        if radioMin == 0 || r < radioMin { radioMin = r }
+        if r > radioMax { radioMax = r }
+        delegado?.trackpadHuella(r, base: baseHuella, minimo: radioMin, maximo: radioMax)
+
+        guard Ajustes.compartidos.presion else { return }
         muestrasHuella.append(r)
-        if muestrasHuella.count <= 5 {
-            baseHuella = muestrasHuella.reduce(0, +) / Double(muestrasHuella.count)
-            return
-        }
+        guard muestrasHuella.count > 4 else { return }
+
         let ratio = r / max(baseHuella, 0.001)
         let a = Ajustes.compartidos
         if !apretando, ratio >= a.presionAbajo {
             apretando = true
             delegado?.trackpadBoton("l", pulsado: true)
-            delegado?.trackpadNota("clic por presión", derecho: false)
+            delegado?.trackpadNota("clic · pulgar apoyado", derecho: false)
         } else if apretando, ratio <= a.presionArriba {
             apretando = false
             delegado?.trackpadBoton("l", pulsado: false)
         }
+    }
+
+    /// Para poder calibrar mirando la pantalla: cuánto llega a cambiar la huella
+    /// entre la punta del pulgar y el pulgar apoyado.
+    func reiniciarMedidas() {
+        radioMin = 0
+        radioMax = 0
     }
 
     /// Al irse la app a segundo plano hay que soltarlo todo.

@@ -18,6 +18,9 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     private var relojHud: Timer?
     private var borrarNota: DispatchWorkItem?
     private var huella: Double = 0
+    private var huellaBase: Double = 0
+    private var huellaMin: Double = 0
+    private var huellaMax: Double = 0
     private var picoGolpe: Double = 0
 
     // MARK: - ciclo de vida
@@ -53,7 +56,8 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
 
         registro.font = .systemFont(ofSize: 12)
         registro.textColor = UIColor(white: 0.36, alpha: 1)
-        registro.text = "listo"
+        let v = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?"
+        registro.text = "LowkPad \(v)"
         registro.isUserInteractionEnabled = false
         trackpad.addSubview(registro)
 
@@ -147,8 +151,14 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     }
 
     @objc private func alFrente() {
+        // Al bloquear el móvil iOS suspende la app y la conexión se queda
+        // muerta: hay que rehacerla, no basta con volver a primer plano.
+        let a = Ajustes.compartidos
+        enlace.conectar(ip: a.ip, puerto: UInt16(a.puerto))
         golpecito.arrancar()
+        volumen.arrancar(en: view)
         Haptica.compartida.preparar()
+        trackpad.reiniciar()
     }
 
     private func pintarHud() {
@@ -157,8 +167,11 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         // un socket UDP se declara listo aunque no llegue nada al otro lado.
         if enlace.listo {
             var texto = "● \(a.ip)  \(Int(enlace.latencia)) ms"
-            if a.presion { texto += String(format: "  ·  huella %.1f", huella) }
-            if a.golpecito { texto += String(format: "  ·  golpe %.2f", picoGolpe) }
+            if huella > 0 {
+                texto += String(format: "  ·  huella %.0f/%.0f x%.2f",
+                                huella, huellaMin, huella / max(huellaBase, 0.001))
+            }
+            if a.golpecito { texto += String(format: "  ·  tiron %.2f", picoGolpe) }
             hud.text = texto
             hud.textColor = UIColor(white: 0.55, alpha: 1)
         } else {
@@ -266,5 +279,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
 
     func trackpadNota(_ texto: String, derecho: Bool) { nota(texto, derecho: derecho) }
 
-    func trackpadHuella(_ radio: Double, base: Double) { huella = radio }
+    func trackpadHuella(_ radio: Double, base: Double, minimo: Double, maximo: Double) {
+        huella = radio; huellaBase = base; huellaMin = minimo; huellaMax = maximo
+    }
 }
