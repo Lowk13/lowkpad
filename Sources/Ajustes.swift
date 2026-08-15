@@ -56,8 +56,11 @@ final class Ajustes {
     @Guardado(clave: "mantenerDerecho", porDefecto: true) var mantenerDerecho: Bool
     @Guardado(clave: "dosDedosDerecho", porDefecto: true) var dosDedosDerecho: Bool
 
-    // --- el experimento de la presión ---
-    @Guardado(clave: "presion", porDefecto: true) var presion: Bool
+    // --- experimento descartado: apoyar el pulgar plano mueve el centro
+    // del contacto, asi que el cursor se desplaza justo al hacer clic y
+    // acabas pulsando en otro sitio. Es un fallo de raiz, no de umbral.
+    // Se deja apagado y accesible por si algun dia sirve. ---
+    @Guardado(clave: "presion", porDefecto: false) var presion: Bool
     @Guardado(clave: "presionAbajo", porDefecto: 1.50) var presionAbajo: Double
     @Guardado(clave: "presionArriba", porDefecto: 1.25) var presionArriba: Double
 

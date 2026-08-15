@@ -20,9 +20,52 @@ final class PantallaAjustes: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = UIColor(white: 0.04, alpha: 1)
 
+        // Barra fija arriba: el botón de volver tiene que estar siempre a mano,
+        // no al final de una pantalla larga de ajustes.
+        let barra = UIView()
+        barra.backgroundColor = UIColor(white: 0.04, alpha: 1)
+        barra.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(barra)
+
+        let atras = UIButton(type: .system)
+        atras.setTitle("‹  Atrás", for: .normal)
+        atras.titleLabel?.font = .systemFont(ofSize: 17)
+        atras.setTitleColor(acento, for: .normal)
+        atras.contentHorizontalAlignment = .leading
+        atras.addTarget(self, action: #selector(cerrarPantalla), for: .touchUpInside)
+        atras.translatesAutoresizingMaskIntoConstraints = false
+        barra.addSubview(atras)
+
+        let rotulo = UILabel()
+        rotulo.text = "Ajustes"
+        rotulo.font = .systemFont(ofSize: 17, weight: .semibold)
+        rotulo.textColor = .white
+        rotulo.translatesAutoresizingMaskIntoConstraints = false
+        barra.addSubview(rotulo)
+
+        let raya = UIView()
+        raya.backgroundColor = borde
+        raya.translatesAutoresizingMaskIntoConstraints = false
+        barra.addSubview(raya)
+
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.keyboardDismissMode = .onDrag
         view.addSubview(scroll)
+
+        NSLayoutConstraint.activate([
+            barra.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            barra.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            barra.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            barra.heightAnchor.constraint(equalToConstant: 48),
+            atras.leadingAnchor.constraint(equalTo: barra.leadingAnchor, constant: 14),
+            atras.centerYAnchor.constraint(equalTo: barra.centerYAnchor),
+            rotulo.centerXAnchor.constraint(equalTo: barra.centerXAnchor),
+            rotulo.centerYAnchor.constraint(equalTo: barra.centerYAnchor),
+            raya.leadingAnchor.constraint(equalTo: barra.leadingAnchor),
+            raya.trailingAnchor.constraint(equalTo: barra.trailingAnchor),
+            raya.bottomAnchor.constraint(equalTo: barra.bottomAnchor),
+            raya.heightAnchor.constraint(equalToConstant: 1),
+        ])
 
         pila.axis = .vertical
         pila.spacing = 7
@@ -30,7 +73,7 @@ final class PantallaAjustes: UIViewController {
         scroll.addSubview(pila)
 
         NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scroll.topAnchor.constraint(equalTo: barra.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -93,7 +136,7 @@ final class PantallaAjustes: UIViewController {
         interruptor("Dos dedos = clic derecho", { self.a.dosDedosDerecho }, { self.a.dosDedosDerecho = $0 })
         nota("Si dejas el segundo dedo apoyado, el botón se queda pulsado: así se arrastra sin levantar nada.")
 
-        titulo("Clic apoyando el pulgar")
+        titulo("Descartado: apoyar el pulgar")
         interruptor("Apoyar el pulgar = clic", { self.a.presion }, { self.a.presion = $0 })
         deslizador("· cuánto hay que apoyar", 1.15, 2.5, { self.a.presionAbajo }, { self.a.presionAbajo = $0 }) {
             String(format: "x%.2f", $0)
@@ -101,10 +144,10 @@ final class PantallaAjustes: UIViewController {
         deslizador("· cuándo se suelta", 1.05, 2.0, { self.a.presionArriba }, { self.a.presionArriba = $0 }) {
             String(format: "x%.2f", $0)
         }
-        nota("No es apretar más fuerte (eso cambia la huella un 20 % y se pierde en el ruido): es pasar "
-             + "de apuntar con la PUNTA del pulgar a apoyarlo PLANO, que la cambia al doble. Arriba "
-             + "sale «huella actual/mínima x factor»: apoya el pulgar plano, mira hasta dónde sube el "
-             + "factor y pon el umbral por debajo de ese máximo.")
+        nota("Apagado por defecto: al girar el pulgar de punta a plano, el centro del "
+             + "contacto se desplaza sí o sí, así que el cursor se mueve justo al hacer clic y "
+             + "acabas pulsando donde no querías. Es un fallo de raíz, no de umbral. Se deja "
+             + "aquí por si algún día se le encuentra utilidad.")
 
         titulo("Pantalla y tacto")
         interruptor("Vibración al hacer clic", { self.a.haptico }, { self.a.haptico = $0 })
