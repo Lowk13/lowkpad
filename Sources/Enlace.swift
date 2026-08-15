@@ -32,7 +32,18 @@ final class Enlace {
     private(set) var latencia: Double = 0
     private var muestras: [Double] = []
 
-    private(set) var listo = false
+    /// El socket existe. **No significa que el PC reciba nada**: un socket UDP
+    /// se declara listo en cuanto se crea, aunque iOS esté tirando los paquetes
+    /// por falta de permiso de red local.
+    private(set) var socketListo = false
+
+    /// Instante del último "pong" recibido. Esta es la única prueba de verdad
+    /// de que el PC nos está oyendo y contestando.
+    private var ultimoPong: CFAbsoluteTime = 0
+
+    /// De verdad conectado: el PC ha contestado hace poco.
+    var listo: Bool { CFAbsoluteTimeGetCurrent() - ultimoPong < 2.0 }
+
     var alCambiar: ((Bool) -> Void)?
 
     private var ms: Int { Int((DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000) }
@@ -61,7 +72,7 @@ final class Enlace {
                 case .failed, .cancelled: ok = false
                 default: return
                 }
-                self.listo = ok
+                self.socketListo = ok
                 DispatchQueue.main.async { self.alCambiar?(ok) }
             }
 
@@ -82,6 +93,7 @@ final class Enlace {
                 if let r = texto.range(of: "\"p\":"),
                    let valor = Int(texto[r.upperBound...].prefix(while: { $0.isNumber })) {
                     let ida = Double(self.ms - valor)
+                    self.ultimoPong = CFAbsoluteTimeGetCurrent()
                     self.muestras.append(ida)
                     if self.muestras.count > 15 { self.muestras.removeFirst() }
                     let ordenadas = self.muestras.sorted()

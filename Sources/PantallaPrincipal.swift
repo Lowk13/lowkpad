@@ -10,6 +10,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     private let engranaje = UIButton(type: .system)
     private let oscurecedor = UIView()
 
+    private let permiso = PermisoRedLocal()
     private let golpecito = Golpecito()
     private let volumen = BotonesVolumen()
     private let enlace = Enlace.compartido
@@ -27,6 +28,9 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
 
         hud.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         hud.textColor = UIColor(white: 0.55, alpha: 1)
+        hud.isUserInteractionEnabled = true
+        hud.addGestureRecognizer(UITapGestureRecognizer(target: self,
+                                                        action: #selector(diagnosticar)))
         view.addSubview(hud)
 
         engranaje.setTitle("ajustes", for: .normal)
@@ -119,6 +123,9 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     private func arrancarTodo() {
         let a = Ajustes.compartidos
         UIApplication.shared.isIdleTimerDisabled = true
+        // Provoca el aviso de "permitir buscar dispositivos en tu red local".
+        // Sin permiso, iOS tira los paquetes sin avisar de nada.
+        permiso.pedir()
         enlace.conectar(ip: a.ip, puerto: UInt16(a.puerto))
         golpecito.arrancar()
         volumen.arrancar(en: view)
@@ -146,13 +153,18 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
 
     private func pintarHud() {
         let a = Ajustes.compartidos
-        let punto = enlace.listo ? "●" : "○"
-        var texto = "\(punto) \(a.ip)  \(Int(enlace.latencia)) ms"
-        if a.presion { texto += String(format: "  ·  huella %.1f", huella) }
-        if a.golpecito { texto += String(format: "  ·  golpe %.2f", picoGolpe) }
-        hud.text = texto
-        hud.textColor = enlace.listo ? UIColor(white: 0.55, alpha: 1)
-                                     : UIColor(red: 1, green: 0.36, blue: 0.36, alpha: 1)
+        // El estado se basa en que el PC CONTESTE, no en que el socket exista:
+        // un socket UDP se declara listo aunque no llegue nada al otro lado.
+        if enlace.listo {
+            var texto = "● \(a.ip)  \(Int(enlace.latencia)) ms"
+            if a.presion { texto += String(format: "  ·  huella %.1f", huella) }
+            if a.golpecito { texto += String(format: "  ·  golpe %.2f", picoGolpe) }
+            hud.text = texto
+            hud.textColor = UIColor(white: 0.55, alpha: 1)
+        } else {
+            hud.text = "○ sin respuesta de \(a.ip) · toca aquí"
+            hud.textColor = UIColor(red: 1, green: 0.36, blue: 0.36, alpha: 1)
+        }
     }
 
     // MARK: - clics que no vienen del trackpad
@@ -181,6 +193,30 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     @objc private func barraArriba() {
         enlace.boton("l", pulsado: false)
         barra.backgroundColor = UIColor(white: 0.08, alpha: 1)
+    }
+
+    @objc private func diagnosticar() {
+        let a = Ajustes.compartidos
+        permiso.pedir()
+        hud.text = "probando \(a.ip)..."
+        Diagnostico.probar(ip: a.ip, puertoUDP: UInt16(a.puerto)) { [weak self] r in
+            let titulo = (r.tcp && r.udp) ? "Conectado" : "No llega al PC"
+            let cuerpo = "TCP 8787: \(r.tcp ? "responde" : "nada")
+"
+                       + "UDP \(a.puerto): \(r.udp ? "responde" : "nada")
+
+"
+                       + r.detalle
+            let alerta = UIAlertController(title: titulo, message: cuerpo,
+                                           preferredStyle: .alert)
+            alerta.addAction(UIAlertAction(title: "Vale", style: .default))
+            alerta.addAction(UIAlertAction(title: "Abrir Ajustes de iOS", style: .default) { _ in
+                if let u = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(u)
+                }
+            })
+            self?.present(alerta, animated: true)
+        }
     }
 
     @objc private func abrirAjustes() {

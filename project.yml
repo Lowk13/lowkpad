@@ -27,6 +27,10 @@ targets:
         # Desde iOS 14, hablar con una IP de tu propia red exige este permiso.
         NSLocalNetworkUsageDescription:
           LowkPad se conecta con el programa que corre en tu PC dentro de tu red local.
+        # Sin esto, buscar servicios Bonjour falla en silencio y iOS nunca
+        # llega a preguntar por el permiso de red local.
+        NSBonjourServices:
+          - _lowkpad._udp
         NSMotionUsageDescription:
           El acelerómetro se usa para detectar el golpecito en la trasera del móvil
           y convertirlo en un clic.
