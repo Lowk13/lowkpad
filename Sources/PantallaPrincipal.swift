@@ -201,12 +201,12 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         hud.text = "probando \(a.ip)..."
         Diagnostico.probar(ip: a.ip, puertoUDP: UInt16(a.puerto)) { [weak self] r in
             let titulo = (r.tcp && r.udp) ? "Conectado" : "No llega al PC"
-            let cuerpo = "TCP 8787: \(r.tcp ? "responde" : "nada")
-"
-                       + "UDP \(a.puerto): \(r.udp ? "responde" : "nada")
+            let cuerpo = """
+            TCP 8787: \(r.tcp ? "responde" : "nada")
+            UDP \(a.puerto): \(r.udp ? "responde" : "nada")
 
-"
-                       + r.detalle
+            \(r.detalle)
+            """
             let alerta = UIAlertController(title: titulo, message: cuerpo,
                                            preferredStyle: .alert)
             alerta.addAction(UIAlertAction(title: "Vale", style: .default))
