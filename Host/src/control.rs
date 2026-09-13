@@ -54,6 +54,10 @@ fn tecla_codigo(nombre: &str) -> Option<u16> {
     })
 }
 fn tecla(nombre: &str) -> Result<(), String> {
+    if nombre == "paste" {
+        return inyectar(&[entrada(0x11, 0, 0), entrada(0x56, 0, 0),
+                          entrada(0x56, 0, 2), entrada(0x11, 0, 2)]);
+    }
     let vk = tecla_codigo(nombre).ok_or("Tecla no admitida")?;
     let extended = if (0x25..=0x28).contains(&vk) { 1 } else { 0 };
     inyectar(&[entrada(vk, 0, extended), entrada(vk, 0, extended | 2)])
@@ -123,6 +127,11 @@ fn ejecutar(v: &Value, hwnd: HWND) -> Result<Value, String> {
         "text" => { texto(v["text"].as_str().ok_or("Falta texto")?)?; Ok(json!({})) }
         "clipboard_get" => Ok(json!({"text": leer_clip(hwnd)?})),
         "clipboard_set" => { escribir_clip(hwnd, v["text"].as_str().ok_or("Falta texto")?)?; Ok(json!({})) }
+        "clipboard_paste" => {
+            escribir_clip(hwnd, v["text"].as_str().ok_or("Falta texto")?)?;
+            tecla("paste")?;
+            Ok(json!({}))
+        }
         "status" => Ok(json!({"version":"0.3.0"})),
         _ => Err("Orden no admitida".into()),
     }

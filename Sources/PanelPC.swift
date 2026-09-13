@@ -82,6 +82,10 @@ final class PanelPC: UIViewController {
                 guard let self, self.validarTexto() else { return }
                 self.orden(["op": "clipboard_set", "text": self.texto.text ?? ""], exito: "Copiado en el PC. Pulsa Ctrl+V donde quieras pegarlo.")
             })
+            pila.addArrangedSubview(boton("Enviar y pegar en el PC", icono: "doc.on.clipboard.fill") { [weak self] in
+                guard let self, self.validarTexto() else { return }
+                self.orden(["op": "clipboard_paste", "text": self.texto.text ?? ""], exito: "Texto enviado y pegado en la ventana activa del PC.")
+            })
             aviso("Para traer texto del iPhone, mantén pulsado el cuadro y elige Pegar. Solo se transfiere al pulsar un botón.")
         case .teclado:
             aviso("Selecciona en el PC dónde escribir. Escribe aquí con el teclado del iPhone y pulsa Enviar texto.")

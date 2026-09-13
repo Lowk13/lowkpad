@@ -74,6 +74,10 @@ try:
     check('Editor Windows recibe Unicode y saltos de línea',editor.get('1.0','end-1c')==sample)
     check('Borrar confirmado',orden('key',key='backspace')['ok']);pump()
     check('Borrar actúa en el editor',editor.get('1.0','end-1c')==sample[:-1])
+    if puede_clip:
+        editor.delete('1.0', 'end');editor.focus_set()
+        check('Enviar y pegar confirmado',orden('clipboard_paste',text=sample)['ok']);pump()
+        check('Pegado real en la ventana del PC',editor.get('1.0','end-1c')==sample)
     for name,vk in [('previous',0xB1),('next',0xB0),('play_pause',0xB3),('stop',0xB2),('volume_up',0xAF),('volume_down',0xAE),('mute',0xAD)]:
         respuesta=orden('key',key=name)
         check('Multimedia '+name, respuesta['ok'] and (vk,0x100) in events and (vk,0x101) in events)

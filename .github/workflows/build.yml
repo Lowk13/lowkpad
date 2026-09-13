@@ -57,17 +57,22 @@ jobs:
           path: LowkPad.ipa
 
       - name: Probar paneles en iPhone 13 e iPhone Air
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           RUNTIME=$(xcrun simctl list runtimes -j | python3 -c 'import sys,json; print([r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and ".iOS-" in r["identifier"]][-1])')
+          RESULTADO=0
           for MODEL in iPhone-13 iPhone-Air; do
             DEVICE=$(xcrun simctl create "LowkPad-$MODEL" "com.apple.CoreSimulator.SimDeviceType.$MODEL" "$RUNTIME")
             xcodebuild -project LowkPad.xcodeproj -scheme LowkPad -configuration Debug \
               -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build-sim \
-              -resultBundlePath "TestResults-$MODEL.xcresult" CODE_SIGNING_ALLOWED=NO test
-            xcrun xcresulttool export attachments --path "TestResults-$MODEL.xcresult" --output-path "capturas/$MODEL"
+              -parallel-testing-enabled NO -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
+              -resultBundlePath "TestResults-$MODEL.xcresult" CODE_SIGNING_ALLOWED=NO test || RESULTADO=1
+            xcrun xcresulttool export attachments --path "TestResults-$MODEL.xcresult" --output-path "capturas/$MODEL" || true
             xcrun simctl shutdown "$DEVICE"
           done
+          exit "$RESULTADO"
 
       - name: Guardar pruebas de interfaz
         if: always()

@@ -90,7 +90,7 @@ Los paneles tienen scroll y se ajustan al teclado mediante `keyboardLayoutGuide`
 - **Multimedia:** anterior, siguiente, play/pausa, stop, volumen +/− y silencio. Se envían las
   teclas multimedia estándar de Windows; la aplicación reproductora decide cuáles admite.
 - **Portapapeles:** copiar en el PC con Ctrl+C → Recuperar del PC → Copiar al iPhone.
-  Para el sentido contrario, pegar o escribir en el cuadro → Enviar al portapapeles del PC → Ctrl+V.
+  Para el sentido contrario, pegar o escribir en el cuadro → Enviar y pegar en el PC. También se puede enviar solo al portapapeles sin pegar.
   Solo texto, máximo 64 KB; nunca se sincroniza automáticamente.
 - **Teclado:** seleccionar el destino en el PC, escribir en el cuadro con el teclado nativo del
   iPhone y pulsar Enviar texto. Incluye Intro, Borrar, Tab, Esc y flechas. Compatible con Unicode.
