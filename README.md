@@ -117,3 +117,23 @@ GitHub Actions compila la IPA y ejecuta pruebas de interfaz en simuladores iPhon
 incluyendo el teclado desplegado; guarda resultados y capturas como artefactos.
 
 La interacción física en LiveContainer, la háptica y el Wi-Fi requieren probar la IPA en el iPhone.
+
+
+## 0.4.0 — teclado en directo y atajos
+
+Al abrir Teclado aparece automáticamente el teclado de iOS. Cada letra, borrar e Intro se
+manda inmediatamente al PC; ya no hay cuadro de composición ni botón Enviar. El móvil no guarda
+el texto tecleado. La autocorrección está desactivada para no reescribir texto alrededor de un
+cursor que solo conoce el PC. Si falla la conexión, se pausa el teclado y se descartan las teclas
+pendientes; tocar la zona del teclado permite reconectar tras comprobar el texto del PC.
+
+TCP 8787 permanece abierto mientras se usa. Las órdenes se confirman en orden, con TCP_NODELAY,
+sin abrir una conexión por letra ni retransmitir acciones desde la app. El host admite hasta ocho
+conexiones y serializa la ejecución para que dos atajos no mezclen sus modificadores.
+
+Atajos, accesible deslizando la barra inferior, incluye **Win + Mayús + izquierda/derecha**,
+Ctrl+C/X/V/A/Z/Y/S/F, Alt+Tab, Win+D, Win+flechas y atajos de pestañas Ctrl+T/W/Mayús+T/R.
+Los modificadores se pulsan y liberan juntos en un lote de entrada de Windows.
+
+Referencias: [UIKeyInput de Apple](https://developer.apple.com/documentation/uikit/uikeyinput)
+y [atajos de Windows de Microsoft](https://support.microsoft.com/en-us/windows/keyboard-shortcuts-in-windows-dcc61a57-8ff0-cffe-9796-cb9706c75eec).

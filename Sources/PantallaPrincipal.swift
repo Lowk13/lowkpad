@@ -262,7 +262,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
             filaHerramientas.bottomAnchor.constraint(equalTo: herramientas.contentLayoutGuide.bottomAnchor, constant: -4),
             filaHerramientas.heightAnchor.constraint(equalTo: herramientas.frameLayoutGuide.heightAnchor, constant: -8),
         ])
-        for funcion in [FuncionPC.multimedia, .portapapeles, .teclado] {
+        for funcion in [FuncionPC.multimedia, .portapapeles, .teclado, .atajos] {
             herramienta(funcion.rawValue, icono: funcion.icono) { [weak self] in self?.abrirPanel(funcion) }
         }
         herramienta("Ajustes", icono: "slider.horizontal.3") { [weak self] in self?.abrirAjustes() }

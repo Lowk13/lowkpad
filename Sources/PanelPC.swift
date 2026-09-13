@@ -1,12 +1,13 @@
 import UIKit
 
 enum FuncionPC: String {
-    case multimedia = "Multimedia", portapapeles = "Portapapeles", teclado = "Teclado"
+    case multimedia = "Multimedia", portapapeles = "Portapapeles", teclado = "Teclado", atajos = "Atajos"
     var icono: String {
         switch self {
         case .multimedia: return "playpause.fill"
         case .portapapeles: return "doc.on.clipboard"
         case .teclado: return "keyboard"
+        case .atajos: return "command"
         }
     }
 }
@@ -17,6 +18,8 @@ final class PanelPC: UIViewController {
     private let pila = UIStackView()
     private let estado = UILabel()
     private let texto = UITextView()
+    private let directo = TecladoRemoto()
+    private var pruebaTexto = ""
     private var botones: [UIButton] = []
     var alCerrar: (() -> Void)?
     init(_ funcion: FuncionPC) { self.funcion = funcion; super.init(nibName: nil, bundle: nil) }
@@ -58,6 +61,15 @@ final class PanelPC: UIViewController {
         estado.textColor = .secondaryLabel
         estado.accessibilityIdentifier = "estadoPanel"
 
+        NotificationCenter.default.addObserver(self, selector: #selector(pausarTeclado),
+            name: UIApplication.willResignActiveNotification, object: nil)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing") {
+            NotificationCenter.default.addObserver(self, selector: #selector(registrarPrueba(_:)),
+                name: .init("LowkPadOrdenPrueba"), object: nil)
+        }
+        #endif
+
         switch funcion {
         case .multimedia:
             aviso("Controla la reproducción y el volumen del PC.")
@@ -88,18 +100,86 @@ final class PanelPC: UIViewController {
             })
             aviso("Para traer texto del iPhone, mantén pulsado el cuadro y elige Pegar. Solo se transfiere al pulsar un botón.")
         case .teclado:
-            aviso("Selecciona en el PC dónde escribir. Escribe aquí con el teclado del iPhone y pulsa Enviar texto.")
-            editor()
-            pila.addArrangedSubview(boton("Enviar texto", icono: "paperplane.fill") { [weak self] in
-                guard let self, self.validarTexto(), !self.texto.text.isEmpty else { return }
-                self.orden(["op": "text", "text": self.texto.text ?? ""], exito: "Texto enviado al PC.") { _ in self.texto.text = "" }
-            })
+            aviso("Escribe mirando el PC: cada tecla se envía al momento. Sin autocorrección que cambie palabras a distancia.")
+            directo.alEscribir = { [weak self] text in
+                self?.enviarDirecto(text == "\n" ? ["op": "key", "key": "enter"] : ["op": "text", "text": text])
+            }
+            directo.alBorrar = { [weak self] in self?.enviarDirecto(["op": "key", "key": "backspace"]) }
+            directo.alActivar = { [weak self] in self?.activarTeclado() }
+            pila.addArrangedSubview(directo)
             fila([("Intro", "return", "enter"), ("Borrar", "delete.left", "backspace")])
             fila([("Tab", "arrow.right.to.line", "tab"), ("Esc", "escape", "escape")])
             fila([("Izquierda", "arrow.left", "left"), ("Derecha", "arrow.right", "right")])
             fila([("Arriba", "arrow.up", "up"), ("Abajo", "arrow.down", "down")])
+        case .atajos:
+            aviso("Se aplican a la ventana activa del PC.")
+            filaAtajos([("Monitor izquierdo", "Win + Mayús + ←", "monitor_left"), ("Monitor derecho", "Win + Mayús + →", "monitor_right")])
+            filaAtajos([("Copiar", "Ctrl + C", "copy"), ("Pegar", "Ctrl + V", "paste")])
+            filaAtajos([("Cortar", "Ctrl + X", "cut"), ("Seleccionar todo", "Ctrl + A", "select_all")])
+            filaAtajos([("Deshacer", "Ctrl + Z", "undo"), ("Rehacer", "Ctrl + Y", "redo")])
+            filaAtajos([("Guardar", "Ctrl + S", "save"), ("Buscar", "Ctrl + F", "find")])
+            filaAtajos([("Cambiar ventana", "Alt + Tab", "switch_window"), ("Escritorio", "Win + D", "desktop")])
+            filaAtajos([("Ajustar izquierda", "Win + ←", "snap_left"), ("Ajustar derecha", "Win + →", "snap_right")])
+            filaAtajos([("Maximizar", "Win + ↑", "maximize"), ("Minimizar", "Win + ↓", "minimize")])
+            filaAtajos([("Nueva pestaña", "Ctrl + T", "new_tab"), ("Cerrar pestaña", "Ctrl + W", "close_tab")])
+            filaAtajos([("Recuperar pestaña", "Ctrl + Mayús + T", "reopen_tab"), ("Recargar", "Ctrl + R", "refresh")])
         }
         pila.addArrangedSubview(estado)
+    }
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if funcion == .teclado { activarTeclado() }
+    }
+    private func activarTeclado() {
+        estado.text = "Conectando teclado…"
+        ControlPC.compartido.enviar(["op": "status"]) { [weak self] result in
+            guard let self, self.view.window != nil else { return }
+            switch result {
+            case .success:
+                self.directo.habilitado = true
+                self.directo.becomeFirstResponder()
+                self.estado.text = "Teclado en directo"
+            case .failure(let error): self.estado.text = error.localizedDescription
+            }
+        }
+    }
+    private func enviarDirecto(_ orden: [String: Any]) {
+        guard directo.habilitado else { return }
+        ControlPC.compartido.enviar(orden) { [weak self] result in
+            guard let self else { return }
+            if case .failure(let error) = result {
+                self.directo.habilitado = false
+                self.directo.resignFirstResponder()
+                self.estado.text = error.localizedDescription + " Toca el teclado para reconectar."
+            }
+        }
+    }
+    @objc private func pausarTeclado() {
+        guard funcion == .teclado else { return }
+        directo.habilitado = false
+        directo.resignFirstResponder()
+        ControlPC.compartido.cancelarPendientes()
+    }
+    #if DEBUG
+    @objc private func registrarPrueba(_ n: Notification) {
+        let op = n.userInfo?["op"] as? String
+        if op == "text" { pruebaTexto += n.userInfo?["text"] as? String ?? "" }
+        if op == "key", n.userInfo?["key"] as? String == "backspace", !pruebaTexto.isEmpty { pruebaTexto.removeLast() }
+        if op == "key", n.userInfo?["key"] as? String == "enter" { pruebaTexto += "\n" }
+        estado.accessibilityValue = op == "shortcut" ? n.userInfo?["name"] as? String : pruebaTexto
+    }
+    #endif
+    private func filaAtajos(_ items: [(String, String, String)]) {
+        let row = UIStackView()
+        row.spacing = 12; row.distribution = .fillEqually
+        for (titulo, combinacion, nombre) in items {
+            let b = boton(titulo, icono: "") { [weak self] in
+                self?.orden(["op": "shortcut", "name": nombre], exito: "Atajo enviado al PC.")
+            }
+            b.configuration?.subtitle = combinacion
+            row.addArrangedSubview(b)
+        }
+        pila.addArrangedSubview(row)
     }
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
@@ -149,7 +229,10 @@ final class PanelPC: UIViewController {
         }
         pila.addArrangedSubview(row)
     }
-    private func tecla(_ key: String) { orden(["op": "key", "key": key], exito: "Orden enviada al PC.") }
+    private func tecla(_ key: String) {
+        if funcion == .teclado { enviarDirecto(["op": "key", "key": key]) }
+        else { orden(["op": "key", "key": key], exito: "Orden enviada al PC.") }
+    }
     private func validarTexto() -> Bool {
         guard texto.text.utf8.count <= 65536 else { estado.text = "Máximo 64 KB de texto por envío."; return false }
         return true

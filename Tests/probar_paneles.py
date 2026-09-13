@@ -56,7 +56,7 @@ def orden(op, **args):
 previo=orden('clipboard_get')
 puede_clip=previo['ok'] and (u.CountClipboardFormats()<=4)
 try:
-    check('Servidor 0.3.0 confirmado',orden('status')['data']['version']=='0.3.0')
+    check('Servidor 0.4.0 confirmado',orden('status')['data']['version']=='0.4.0')
     with socket.create_connection(('127.0.0.1',8787),timeout=4) as s:
         s.sendall(b'{"token":"incorrecta","op":"clipboard_get"}\n')
         check('Clave incorrecta no permite leer texto',not json.loads(s.makefile('rb').readline())['ok'])
