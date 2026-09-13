@@ -289,7 +289,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         let p = PanelPC(funcion)
         p.alCerrar = { [weak self] in
             guard let self, UIApplication.shared.applicationState == .active else { return }
-            self.golpecito.arrancar()
+            DispatchQueue.main.async { self.alFrente() }
         }
         p.modalPresentationStyle = .pageSheet
         if let sheet = p.sheetPresentationController {

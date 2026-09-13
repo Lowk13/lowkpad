@@ -4,8 +4,7 @@ version = "0.3.0"
 edition = "2021"
 description = "Servidor de LowkPad: convierte los paquetes del iPhone en movimiento del raton"
 
-# Sin dependencias a proposito: se llama a Win32 directamente. El binario baja a
-# unos cientos de KB y no hay nada que descargar ni que se pueda quedar obsoleto.
+# Win32 directo; serde_json valida y escapa el texto del canal de paneles.
 [dependencies]
 serde_json = "1"
 

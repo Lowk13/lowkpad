@@ -33,7 +33,6 @@ clic sin mirar.
 | Método | Para qué agarre |
 |---|---|
 | **Golpecito en la trasera** (acelerómetro) | Una mano. El pulgar apunta y no se levanta; el índice golpea por detrás. |
-| **Botones de volumen** | Una mano. Clic físico de verdad, cero espacio en pantalla. |
 | **Segundo dedo** | Dos manos. Toque = clic; dedo apoyado = botón pulsado, para arrastrar sin levantar nada. |
 | **Tocar / tap y medio** | Cualquiera. El clásico. |
 | **Barra inferior** | Dos manos. |
@@ -57,8 +56,7 @@ No se firma nada: LiveContainer no lo necesita.
 
 ## Qué falta
 
-Los paneles de teclado, media y volumen del PC, portapapeles y scripts. Y el emparejado por QR
-en vez de escribir la IP a mano. Van después de decidir el método de clic.
+El emparejado por QR, el cifrado de extremo a extremo y los accesos directos/scripts.
 
 
 ## Revisión 0.2.0 (13/09/2026)
@@ -80,3 +78,42 @@ El prototipo actual todavía NO implementa el emparejado/cifrado descrito en PLA
 
 Referencias de implementación: [muestras táctiles de UIKit](https://developer.apple.com/documentation/uikit/uievent/coalescedtouches(for:))
 y [orden de eventos SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput).
+
+
+## 0.3.0 — barra inferior y paneles
+
+La barra inferior se desliza horizontalmente y reserva el área del indicador de inicio.
+Multimedia, Portapapeles y Teclado abren paneles nativos. Ajustes también está en la barra.
+La distribución utiliza el área segura del dispositivo, sin coordenadas propias del iPhone 13.
+Los paneles tienen scroll y se ajustan al teclado mediante `keyboardLayoutGuide`.
+
+- **Multimedia:** anterior, siguiente, play/pausa, stop, volumen +/− y silencio. Se envían las
+  teclas multimedia estándar de Windows; la aplicación reproductora decide cuáles admite.
+- **Portapapeles:** copiar en el PC con Ctrl+C → Recuperar del PC → Copiar al iPhone.
+  Para el sentido contrario, pegar o escribir en el cuadro → Enviar al portapapeles del PC → Ctrl+V.
+  Solo texto, máximo 64 KB; nunca se sincroniza automáticamente.
+- **Teclado:** seleccionar el destino en el PC, escribir en el cuadro con el teclado nativo del
+  iPhone y pulsar Enviar texto. Incluye Intro, Borrar, Tab, Esc y flechas. Compatible con Unicode.
+- **Botones físicos de volumen:** se ha retirado por completo su captura. Funcionan normalmente en iOS.
+
+### Conexión de los paneles
+
+El ratón conserva UDP 8788. Los paneles usan TCP 8787 con respuesta de éxito/error y envío
+secuencial. No se reintentan órdenes automáticamente: si se pierde una confirmación, se avisa
+porque la orden podría haberse aplicado. No se reproduce el texto automáticamente al reconectar.
+
+El host crea `paneles.key` junto al ejecutable. Pegar su contenido en **Ajustes → Clave de enlace**
+en cada iPhone. No incluirlo en el repositorio ni en la IPA. La clave se conserva al actualizar
+el host y la app guarda la copia local en UserDefaults. Las órdenes no autenticadas se rechazan.
+Este canal está diseñado para la LAN de confianza: TCP usa una clave de acceso pero todavía no TLS.
+
+### Verificación
+
+`cargo test` comprueba las estructuras de entrada y la lista cerrada de teclas.
+`Tests/probar_paneles.py` usa una ventana real de Windows, Unicode y portapapeles, y observa las
+teclas multimedia mediante un hook que impide cambiar la reproducción durante la prueba.
+No muestra el contenido anterior del portapapeles ni la clave de enlace.
+GitHub Actions compila la IPA y ejecuta pruebas de interfaz en simuladores iPhone 13 e iPhone Air,
+incluyendo el teclado desplegado; guarda resultados y capturas como artefactos.
+
+La interacción física en LiveContainer, la háptica y el Wi-Fi requieren probar la IPA en el iPhone.
