@@ -77,6 +77,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         construirHerramientas()
 
         oscurecedor.backgroundColor = .black
+        oscurecedor.alpha = CGFloat(Ajustes.compartidos.oscurecer)
         oscurecedor.isUserInteractionEnabled = false
         view.addSubview(oscurecedor)
 
