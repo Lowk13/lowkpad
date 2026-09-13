@@ -34,6 +34,7 @@ final class Ajustes {
 
     // --- conexión ---
     @Guardado(clave: "ip", porDefecto: "192.168.1.41") var ip: String
+    @Guardado(clave: "clavePaneles", porDefecto: "") var clavePaneles: String
     @Guardado(clave: "puerto", porDefecto: 8788) var puerto: Int
 
     // --- movimiento (esto viaja al PC) ---
@@ -48,8 +49,6 @@ final class Ajustes {
     @Guardado(clave: "golpecito", porDefecto: true) var golpecito: Bool
     @Guardado(clave: "umbralGolpe", porDefecto: 0.35) var umbralGolpe: Double
     @Guardado(clave: "golpeDerecho", porDefecto: false) var golpeDerecho: Bool
-    @Guardado(clave: "volumen", porDefecto: true) var volumen: Bool
-    @Guardado(clave: "volumenInvertido", porDefecto: false) var volumenInvertido: Bool
     @Guardado(clave: "tocarClic", porDefecto: true) var tocarClic: Bool
     @Guardado(clave: "segundoDedo", porDefecto: true) var segundoDedo: Bool
     @Guardado(clave: "barraClic", porDefecto: false) var barraClic: Bool

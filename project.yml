@@ -18,8 +18,8 @@ targets:
       path: Resources/Info.plist
       properties:
         CFBundleDisplayName: LowkPad
-        CFBundleShortVersionString: "0.2.0"
-        CFBundleVersion: "4"
+        CFBundleShortVersionString: "0.3.0"
+        CFBundleVersion: "5"
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UIStatusBarHidden: true
@@ -39,8 +39,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lowk.lowkpad
-        MARKETING_VERSION: "0.2.0"
-        CURRENT_PROJECT_VERSION: "4"
+        MARKETING_VERSION: "0.3.0"
+        CURRENT_PROJECT_VERSION: "5"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "16.0"
@@ -49,6 +49,19 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
         ENABLE_BITCODE: NO
+
+  LowkPadUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: LowkPad
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGNING_ALLOWED: NO
 
 # Se declara el esquema a mano para no depender de lo que XcodeGen genere solo:
 # xcodebuild exige -scheme en cuanto usas -derivedDataPath.
@@ -61,3 +74,6 @@ schemes:
       config: Release
     archive:
       config: Release
+    test:
+      targets:
+        - LowkPadUITests

@@ -9,10 +9,11 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     private let barra = UIButton(type: .custom)
     private let engranaje = UIButton(type: .system)
     private let oscurecedor = UIView()
+    private let herramientas = UIScrollView()
+    private let filaHerramientas = UIStackView()
 
     private let permiso = PermisoRedLocal()
     private let golpecito = Golpecito()
-    private let volumen = BotonesVolumen()
     private let enlace = Enlace.compartido
 
     private var relojHud: Timer?
@@ -73,6 +74,8 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
                         for: [.touchUpInside, .touchUpOutside, .touchCancel])
         view.addSubview(barra)
 
+        construirHerramientas()
+
         oscurecedor.backgroundColor = .black
         oscurecedor.isUserInteractionEnabled = false
         view.addSubview(oscurecedor)
@@ -80,7 +83,6 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         enlace.alCambiar = { [weak self] _ in self?.pintarHud() }
         golpecito.alGolpear = { [weak self] in self?.golpeDetectado() }
         golpecito.alMedir = { [weak self] p in self?.picoGolpe = p }
-        volumen.alPulsar = { [weak self] subir in self?.volumenPulsado(subir: subir) }
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(alFondo),
@@ -99,16 +101,18 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         super.viewDidLayoutSubviews()
         let s = view.safeAreaInsets
         let a = view.bounds.width, alto = view.bounds.height
-        hud.frame = CGRect(x: 14, y: s.top + 4, width: a - 100, height: 18)
-        engranaje.frame = CGRect(x: a - 84, y: s.top + 2, width: 70, height: 22)
+        hud.frame = CGRect(x: 14, y: s.top, width: a - 110, height: 44)
+        engranaje.frame = CGRect(x: a - 94, y: s.top, width: 80, height: 44)
 
         let hayBarra = Ajustes.compartidos.barraClic
         let altoBarra: CGFloat = hayBarra ? 74 : 0
-        let arriba = s.top + 28
-        let abajo = alto - s.bottom - 8 - altoBarra - (hayBarra ? 8 : 0)
-        trackpad.frame = CGRect(x: 8, y: arriba, width: a - 16, height: abajo - arriba)
+        let arriba = s.top + 48
+        let bordeHerramientas = alto - s.bottom - 76
+        herramientas.frame = CGRect(x: s.left + 8, y: bordeHerramientas, width: a - s.left - s.right - 16, height: 68)
+        let abajo = bordeHerramientas - 8 - altoBarra - (hayBarra ? 8 : 0)
+        trackpad.frame = CGRect(x: 8, y: arriba, width: a - 16, height: max(0, abajo - arriba))
         barra.isHidden = !hayBarra
-        barra.frame = CGRect(x: 8, y: alto - s.bottom - 8 - altoBarra,
+        barra.frame = CGRect(x: 8, y: bordeHerramientas - 8 - altoBarra,
                              width: a - 16, height: altoBarra)
 
         let ancho = Ajustes.compartidos.franjaScroll ? trackpad.bounds.width * 0.14 : 0
@@ -125,6 +129,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     // MARK: - arranque
 
     private func arrancarTodo() {
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing") { return }
         let a = Ajustes.compartidos
         UIApplication.shared.isIdleTimerDisabled = true
         // Provoca el aviso de "permitir buscar dispositivos en tu red local".
@@ -132,7 +137,6 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         permiso.pedir()
         enlace.conectar(ip: a.ip, puerto: UInt16(a.puerto))
         golpecito.arrancar()
-        volumen.arrancar(en: view)
         Haptica.compartida.preparar()
         oscurecedor.alpha = CGFloat(a.oscurecer)
 
@@ -148,17 +152,16 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         trackpad.reiniciar()
         enlace.soltarTodo()
         golpecito.parar()
-        volumen.parar()
     }
 
     @objc private func alFrente() {
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing") { return }
         guard presentedViewController == nil else { return }
         // Al bloquear el móvil iOS suspende la app y la conexión se queda
         // muerta: hay que rehacerla, no basta con volver a primer plano.
         let a = Ajustes.compartidos
         enlace.conectar(ip: a.ip, puerto: UInt16(a.puerto))
         golpecito.arrancar()
-        volumen.arrancar(en: view)
         Haptica.compartida.preparar()
         trackpad.reiniciar()
     }
@@ -189,13 +192,6 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         enlace.clic(derecho ? "r" : "l")
         Haptica.compartida.clic(derecho: derecho)
         nota(derecho ? "clic DERECHO · golpecito" : "clic izquierdo · golpecito", derecho: derecho)
-    }
-
-    private func volumenPulsado(subir: Bool) {
-        let cual = subir ? "r" : "l"
-        enlace.clic(cual)
-        Haptica.compartida.clic(derecho: subir)
-        nota(subir ? "clic DERECHO · volumen +" : "clic izquierdo · volumen −", derecho: subir)
     }
 
     @objc private func barraAbajo() {
@@ -245,6 +241,62 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
             self.view.setNeedsLayout()
         }
         p.modalPresentationStyle = .fullScreen
+        present(p, animated: true)
+    }
+
+    private func construirHerramientas() {
+        herramientas.accessibilityIdentifier = "barraHerramientas"
+        herramientas.showsHorizontalScrollIndicator = true
+        herramientas.alwaysBounceHorizontal = true
+        herramientas.backgroundColor = UIColor(white: 0.08, alpha: 1)
+        herramientas.layer.cornerRadius = 16
+        view.addSubview(herramientas)
+        filaHerramientas.spacing = 6
+        filaHerramientas.translatesAutoresizingMaskIntoConstraints = false
+        herramientas.addSubview(filaHerramientas)
+        NSLayoutConstraint.activate([
+            filaHerramientas.leadingAnchor.constraint(equalTo: herramientas.contentLayoutGuide.leadingAnchor, constant: 6),
+            filaHerramientas.trailingAnchor.constraint(equalTo: herramientas.contentLayoutGuide.trailingAnchor, constant: -6),
+            filaHerramientas.topAnchor.constraint(equalTo: herramientas.contentLayoutGuide.topAnchor, constant: 4),
+            filaHerramientas.bottomAnchor.constraint(equalTo: herramientas.contentLayoutGuide.bottomAnchor, constant: -4),
+            filaHerramientas.heightAnchor.constraint(equalTo: herramientas.frameLayoutGuide.heightAnchor, constant: -8),
+        ])
+        for funcion in [FuncionPC.multimedia, .portapapeles, .teclado] {
+            herramienta(funcion.rawValue, icono: funcion.icono) { [weak self] in self?.abrirPanel(funcion) }
+        }
+        herramienta("Ajustes", icono: "slider.horizontal.3") { [weak self] in self?.abrirAjustes() }
+    }
+    private func herramienta(_ titulo: String, icono: String, accion: @escaping () -> Void) {
+        var cfg = UIButton.Configuration.plain()
+        cfg.title = titulo
+        cfg.image = UIImage(systemName: icono)
+        cfg.imagePlacement = .top
+        cfg.imagePadding = 5
+        cfg.baseForegroundColor = .label
+        cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { entrada in
+            var salida = entrada
+            salida.font = .systemFont(ofSize: 12, weight: .medium)
+            return salida
+        }
+        let b = UIButton(configuration: cfg)
+        b.accessibilityLabel = titulo
+        b.widthAnchor.constraint(equalToConstant: 112).isActive = true
+        b.addAction(UIAction { _ in accion() }, for: .touchUpInside)
+        filaHerramientas.addArrangedSubview(b)
+    }
+    private func abrirPanel(_ funcion: FuncionPC) {
+        alFondo()
+        let p = PanelPC(funcion)
+        p.alCerrar = { [weak self] in
+            guard let self, UIApplication.shared.applicationState == .active else { return }
+            self.golpecito.arrancar()
+        }
+        p.modalPresentationStyle = .pageSheet
+        if let sheet = p.sheetPresentationController {
+            sheet.detents = funcion == .multimedia ? [.medium(), .large()] : [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
         present(p, animated: true)
     }
 

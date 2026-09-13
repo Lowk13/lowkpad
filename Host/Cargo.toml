@@ -1,12 +1,13 @@
 [package]
 name = "lowkpad-host"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Servidor de LowkPad: convierte los paquetes del iPhone en movimiento del raton"
 
 # Sin dependencias a proposito: se llama a Win32 directamente. El binario baja a
 # unos cientos de KB y no hay nada que descargar ni que se pueda quedar obsoleto.
 [dependencies]
+serde_json = "1"
 
 [profile.release]
 opt-level = 3

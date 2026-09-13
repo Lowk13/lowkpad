@@ -3,6 +3,7 @@
 
 mod raton;
 mod win;
+mod control;
 
 use raton::{Cfg, Puntero, CFG};
 use std::collections::HashMap;
@@ -320,6 +321,9 @@ fn main() {
             0, clase.as_ptr(), ancho("LowkPad").as_ptr(), 0,
             0, 0, 0, 0, 0, 0, instancia, std::ptr::null(),
         );
+        std::thread::spawn(move || {
+            if let Err(e) = control::servir(hwnd) { aviso(&format!("Paneles de LowkPad: {e}")); }
+        });
 
         // El icono se carga de un .ico junto al ejecutable; si no está, se usa
         // el genérico de Windows en vez de quedarse sin icono.

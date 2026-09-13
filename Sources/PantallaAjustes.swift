@@ -10,6 +10,7 @@ final class PantallaAjustes: UIViewController {
     private let pila = UIStackView()
     private let a = Ajustes.compartidos
     private let campoIP = UITextField()
+    private let campoClave = UITextField()
 
     private let fondoFila = UIColor(white: 0.07, alpha: 1)
     private let borde = UIColor(white: 0.16, alpha: 1)
@@ -76,7 +77,7 @@ final class PantallaAjustes: UIViewController {
             scroll.topAnchor.constraint(equalTo: barra.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scroll.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
             pila.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 10),
             pila.leadingAnchor.constraint(equalTo: scroll.leadingAnchor, constant: 16),
             pila.trailingAnchor.constraint(equalTo: scroll.trailingAnchor, constant: -16),
@@ -90,6 +91,16 @@ final class PantallaAjustes: UIViewController {
     private func construir() {
         titulo("Conexión")
         filaIP()
+        campoClave.text = a.clavePaneles
+        campoClave.placeholder = "Pegar clave de enlace del PC"
+        campoClave.accessibilityLabel = "Clave de enlace"
+        campoClave.borderStyle = .roundedRect
+        campoClave.autocapitalizationType = .none
+        campoClave.autocorrectionType = .no
+        campoClave.isSecureTextEntry = true
+        campoClave.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
+        pila.addArrangedSubview(campoClave)
+        nota("La clave activa multimedia, teclado y portapapeles. Se guarda en este iPhone. Los botones físicos de volumen mantienen su función normal.")
 
         titulo("Velocidad")
         deslizador("Velocidad del cursor", 0.4, 5.0, { self.a.ganancia }, { self.a.ganancia = $0 }) {
@@ -123,11 +134,6 @@ final class PantallaAjustes: UIViewController {
              + "tu propia mano amortigua el golpe y por fuerza nunca llegaba. En la pantalla principal "
              + "sale «tiron» con el pico. Da un golpecito flojito, mira qué marca y pon el umbral "
              + "algo por debajo.")
-
-        interruptor("Botones de volumen", { self.a.volumen }, { self.a.volumen = $0 })
-        interruptor("· intercambiar izquierdo y derecho", { self.a.volumenInvertido }, { self.a.volumenInvertido = $0 })
-        nota("Bajar = clic izquierdo, subir = clic derecho. Mientras la app esté abierta, el volumen "
-             + "del móvil se queda anclado a la mitad.")
 
         titulo("Clic en la pantalla")
         interruptor("Tocar para hacer clic", { self.a.tocarClic }, { self.a.tocarClic = $0 })
@@ -170,6 +176,7 @@ final class PantallaAjustes: UIViewController {
 
     @objc private func cerrarPantalla() {
         a.ip = campoIP.text?.trimmingCharacters(in: .whitespaces) ?? a.ip
+        a.clavePaneles = campoClave.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         alCerrar?()
         dismiss(animated: true)
     }
