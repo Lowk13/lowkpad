@@ -70,7 +70,7 @@ jobs:
               -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
               -resultBundlePath "TestResults-$MODEL.xcresult" CODE_SIGNING_ALLOWED=NO test || RESULTADO=1
             xcrun xcresulttool export attachments --path "TestResults-$MODEL.xcresult" --output-path "capturas/$MODEL" || true
-            xcrun simctl shutdown "$DEVICE"
+            xcrun simctl shutdown "$DEVICE" || true
           done
           exit "$RESULTADO"
 
