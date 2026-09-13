@@ -41,7 +41,7 @@ clic sin mirar.
 
 ## Instalar
 
-1. En el PC: `python server.py` (no necesita instalar nada, solo Python).
+1. En el PC: abrir `lowkpad-host.exe` (servidor Rust, UDP 8788).
 2. Descargar `LowkPad.ipa` de la
    [última compilación](../../releases/tag/ultima) **desde el propio iPhone**.
 3. Abrirlo con **LiveContainer**.
@@ -59,3 +59,24 @@ No se firma nada: LiveContainer no lo necesita.
 
 Los paneles de teclado, media y volumen del PC, portapapeles y scripts. Y el emparejado por QR
 en vez de escribir la IP a mano. Van después de decidir el método de clic.
+
+
+## Revisión 0.2.0 (13/09/2026)
+
+- Reconexión sin receptores antiguos; estado y RTT protegidos entre hilos.
+- Primer ping inmediato y reenvío periódico de ajustes para recuperarse de pérdidas/reinicio del host.
+- Cancelar un gesto no hace clic. Scroll y segundo dedo dejan de competir durante un arrastre.
+- Franja de scroll a izquierda o derecha. Los sensores se detienen al entrar en ajustes o perder foco.
+- El host libera los botones tras 2 segundos sin paquetes válidos. El diagnóstico usa una sonda UDP sin tocar el ratón.
+- Clics Win32 como par de eventos, sin un hilo que pueda soltar un arrastre posterior.
+
+El host de esta revisión está en `Host/`. Compilar con `cargo build --release` desde esa carpeta.
+La prueba `Tests/probar_host.py` usa UDP y una ventana de Windows para comprobar entrada real:
+requiere el host abierto, Python con Tkinter y dejar el ratón quieto durante unos segundos.
+
+Las cifras del panel son RTT de red, no latencia dedo-pantalla. La compilación no sustituye
+la prueba de gestos, volumen, háptica y permisos en LiveContainer en el iPhone.
+El prototipo actual todavía NO implementa el emparejado/cifrado descrito en PLAN.md.
+
+Referencias de implementación: [muestras táctiles de UIKit](https://developer.apple.com/documentation/uikit/uievent/coalescedtouches(for:))
+y [orden de eventos SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput).

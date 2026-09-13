@@ -29,7 +29,7 @@ final class BotonesVolumen {
     private var activo = false
 
     func arrancar(en contenedor: UIView) {
-        guard !activo else { return }
+        guard !activo, Ajustes.compartidos.volumen else { return }
         activo = true
 
         vistaOculta.isHidden = false          // oculta no suprime el indicador
@@ -46,7 +46,8 @@ final class BotonesVolumen {
             // El propio hecho de devolver el volumen a su sitio dispara otra
             // notificación. Sin esta guarda entraríamos en bucle.
             if self.restaurando { return }
-            guard Ajustes.compartidos.volumen else { return }
+            guard self.activo, Ajustes.compartidos.volumen,
+                  abs(nuevo - self.ancla) > 0.001 else { return }
 
             let subida = nuevo > self.ancla
             let invertir = Ajustes.compartidos.volumenInvertido
@@ -56,6 +57,7 @@ final class BotonesVolumen {
     }
 
     func parar() {
+        guard activo else { return }
         observador?.invalidate()
         observador = nil
         vistaOculta.removeFromSuperview()

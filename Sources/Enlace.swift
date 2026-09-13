@@ -29,20 +29,22 @@ final class Enlace {
     private var pendientes: [Int: UInt64] = [:]     // ping enviado -> instante
 
     /// Latencia de ida y vuelta, en milisegundos (mediana de las últimas medidas).
-    private(set) var latencia: Double = 0
+    private var medidaLatencia: Double = 0
+    var latencia: Double { cola.sync { medidaLatencia } }
     private var muestras: [Double] = []
 
     /// El socket existe. **No significa que el PC reciba nada**: un socket UDP
     /// se declara listo en cuanto se crea, aunque iOS esté tirando los paquetes
     /// por falta de permiso de red local.
-    private(set) var socketListo = false
+    private var socketPreparado = false
+    var socketListo: Bool { cola.sync { socketPreparado } }
 
     /// Instante del último "pong" recibido. Esta es la única prueba de verdad
     /// de que el PC nos está oyendo y contestando.
     private var ultimoPong: CFAbsoluteTime = 0
 
     /// De verdad conectado: el PC ha contestado hace poco.
-    var listo: Bool { CFAbsoluteTimeGetCurrent() - ultimoPong < 2.0 }
+    var listo: Bool { cola.sync { CFAbsoluteTimeGetCurrent() - ultimoPong < 2.0 } }
 
     var alCambiar: ((Bool) -> Void)?
 
@@ -53,6 +55,10 @@ final class Enlace {
     func conectar(ip: String, puerto: UInt16) {
         cola.async {
             self.conexion?.cancel()
+            self.ultimoPong = 0
+            self.socketPreparado = false
+            self.muestras.removeAll()
+            self.pendientes.removeAll()
 
             let params = NWParameters.udp
             // Marca el tráfico como "voz interactiva": el Wi-Fi lo mete en la cola
@@ -64,29 +70,30 @@ final class Enlace {
             guard let p = NWEndpoint.Port(rawValue: puerto) else { return }
             let c = NWConnection(host: NWEndpoint.Host(ip), port: p, using: params)
 
-            c.stateUpdateHandler = { [weak self] estado in
-                guard let self else { return }
+            c.stateUpdateHandler = { [weak self, weak c] estado in
+                guard let self, let c, self.conexion === c else { return }
                 let ok: Bool
                 switch estado {
                 case .ready: ok = true
                 case .failed, .cancelled: ok = false
                 default: return
                 }
-                self.socketListo = ok
+                self.socketPreparado = ok
+                if ok { self.enviar(conPing: true); self.mandarAjustes() }
                 DispatchQueue.main.async { self.alCambiar?(ok) }
             }
 
             self.conexion = c
             c.start(queue: self.cola)
-            self.recibir()
+            self.recibir(c)
             self.arrancarLatido()
             self.mandarAjustes()
         }
     }
 
-    private func recibir() {
-        conexion?.receiveMessage { [weak self] datos, _, _, _ in
-            guard let self else { return }
+    private func recibir(_ c: NWConnection) {
+        c.receiveMessage { [weak self] datos, _, _, error in
+            guard let self, self.conexion === c else { return }
             // Se interpreta como JSON de verdad y no buscando trozos de texto:
             // la versión anterior buscaba `"p":` y leía cifras justo detrás, pero
             // Python escribe `"p": 123` CON espacio, así que no leía nada y
@@ -95,15 +102,16 @@ final class Enlace {
             if let datos,
                let obj = try? JSONSerialization.jsonObject(with: datos) as? [String: Any],
                obj["t"] as? String == "pong",
-               let valor = obj["p"] as? Int {
-                let ida = Double(self.ms - valor)
+               let valor = obj["p"] as? Int,
+               let enviado = self.pendientes.removeValue(forKey: valor) {
+                let ida = Double(DispatchTime.now().uptimeNanoseconds - enviado) / 1_000_000
                 self.ultimoPong = CFAbsoluteTimeGetCurrent()
                 self.muestras.append(ida)
                 if self.muestras.count > 15 { self.muestras.removeFirst() }
                 let ordenadas = self.muestras.sorted()
-                self.latencia = ordenadas[ordenadas.count / 2]
+                self.medidaLatencia = ordenadas[ordenadas.count / 2]
             }
-            if self.conexion != nil { self.recibir() }
+            if error == nil { self.recibir(c) }
         }
     }
 
@@ -114,7 +122,13 @@ final class Enlace {
         latido?.cancel()
         let t = DispatchSource.makeTimerSource(queue: cola)
         t.schedule(deadline: .now() + 0.1, repeating: 0.1)
-        t.setEventHandler { [weak self] in self?.enviar(conPing: true) }
+        var latidos = 0
+        t.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.enviar(conPing: true)
+            latidos += 1
+            if latidos % 10 == 0 { self.mandarAjustes() }
+        }
         t.resume()
         latido = t
     }
@@ -169,7 +183,11 @@ final class Enlace {
         json += ",\"x\":\(redondo(accX)),\"y\":\(redondo(accY))"
         json += ",\"sx\":\(redondo(accSX)),\"sy\":\(redondo(accSY))"
         json += ",\"b\":\(botones),\"ci\":\(clicId),\"cb\":\"\(clicBoton)\""
-        if conPing { json += ",\"p\":\(t)" }
+        if conPing {
+            pendientes = pendientes.filter { ms - $0.key < 3000 }
+            pendientes[t] = DispatchTime.now().uptimeNanoseconds
+            json += ",\"p\":\(t)"
+        }
         json += "}"
         mandarCrudo(json)
 
@@ -188,7 +206,7 @@ final class Enlace {
     }
 
     private func redondo(_ v: Double) -> String {
-        String(format: "%.2f", v)
+        String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), v)
     }
 
     private func mandarCrudo(_ texto: String) {

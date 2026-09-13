@@ -67,5 +67,6 @@ final class Ajustes {
     // --- pantalla y tacto ---
     @Guardado(clave: "haptico", porDefecto: true) var haptico: Bool
     @Guardado(clave: "franjaScroll", porDefecto: true) var franjaScroll: Bool
+    @Guardado(clave: "franjaIzquierda", porDefecto: false) var franjaIzquierda: Bool
     @Guardado(clave: "oscurecer", porDefecto: 0.0) var oscurecer: Double
 }

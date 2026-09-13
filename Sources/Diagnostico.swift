@@ -1,116 +1,49 @@
 import Foundation
 import Network
 
-/// Averigua POR QUÉ no llega nada al PC.
-///
-/// Con UDP no hay forma de saberlo mirando el socket: no hay saludo ni acuse de
-/// recibo, así que un socket "listo" puede estar tirando todos los paquetes.
-/// Aquí se prueban las dos cosas por separado:
-///
-///  - **TCP al 8787** (el servidor web del prototipo). Si esto conecta, la red y
-///    el permiso de red local están bien, y el problema es solo del UDP
-///    (cortafuegos del PC, o puerto equivocado).
-///  - **UDP al 8788** con un ping propio y espera de respuesta.
-///
-/// Si fallan los dos, casi siempre es el **permiso de red local** de iOS.
+/// El host actual usa UDP; el TCP del prototipo no es un requisito.
 enum Diagnostico {
-
     struct Resultado {
-        var tcp = false
         var udp = false
         var detalle = ""
     }
 
     static func probar(ip: String, puertoUDP: UInt16,
                        completa: @escaping (Resultado) -> Void) {
-        var r = Resultado()
-        let grupo = DispatchGroup()
-
-        grupo.enter()
-        probarTCP(ip: ip, puerto: 8787) { ok in r.tcp = ok; grupo.leave() }
-
-        grupo.enter()
-        probarUDP(ip: ip, puerto: puertoUDP) { ok in r.udp = ok; grupo.leave() }
-
-        grupo.notify(queue: .main) {
-            switch (r.tcp, r.udp) {
-            case (true, true):
-                r.detalle = "Todo bien: el PC contesta por los dos caminos."
-            case (true, false):
-                r.detalle = """
-                El PC se deja ver (TCP 8787 responde) pero el UDP 8788 no llega.
-                Es el cortafuegos de Windows: falta la regla para UDP 8788.
-                """
-            case (false, true):
-                r.detalle = "Raro: llega el UDP pero no el TCP. ¿Servidor a medias?"
-            case (false, false):
-                r.detalle = """
-                No se llega al PC por ningún puerto.
-                1) Comprueba que la IP sea la correcta.
-                2) Mira en Ajustes de iOS → Privacidad y seguridad → Red local
-                   y activa el interruptor de LiveContainer (o de LowkPad).
-                3) Comprueba que el móvil esté en el mismo Wi-Fi y no en 5G.
-                """
-            }
-            completa(r)
-        }
-    }
-
-    private static func probarTCP(ip: String, puerto: UInt16,
-                                  completa: @escaping (Bool) -> Void) {
-        guard let p = NWEndpoint.Port(rawValue: puerto) else { return completa(false) }
-        let params = NWParameters.tcp
+        guard let puerto = NWEndpoint.Port(rawValue: puertoUDP) else { return }
+        let cola = DispatchQueue(label: "lowkpad.diagnostico")
+        let params = NWParameters.udp
         params.prohibitedInterfaceTypes = [.cellular]
-        let c = NWConnection(host: NWEndpoint.Host(ip), port: p, using: params)
-        var respondido = false
-
-        c.stateUpdateHandler = { estado in
-            guard !respondido else { return }
+        let c = NWConnection(host: NWEndpoint.Host(ip), port: puerto, using: params)
+        var terminado = false
+        func terminar(_ ok: Bool) {
+            guard !terminado else { return }
+            terminado = true
+            c.cancel()
+            let detalle = ok ? "El servidor contesta por UDP. La cifra del panel es ida y vuelta de red, no latencia total del cursor."
+                : "Comprueba la IP, que LowkPad esté abierto en el PC, el permiso de Red local de LiveContainer, el Wi-Fi y el cortafuegos de Windows."
+            DispatchQueue.main.async { completa(Resultado(udp: ok, detalle: detalle)) }
+        }
+        c.stateUpdateHandler = { [weak c] estado in
+            guard let c, !terminado else { return }
             switch estado {
             case .ready:
-                respondido = true; c.cancel(); completa(true)
-            case .failed, .cancelled:
-                respondido = true; c.cancel(); completa(false)
+                for intento in 0..<3 {
+                    cola.asyncAfter(deadline: .now() + Double(intento) * 0.25) {
+                        guard !terminado else { return }
+                        c.send(content: Data("{\"t\":\"ping\",\"p\":1}".utf8), completion: .idempotent)
+                    }
+                }
+                c.receiveMessage { datos, _, _, _ in
+                    let obj = datos.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                    terminar(obj?["t"] as? String == "pong" && obj?["p"] as? Int == 1)
+                }
+            case .failed: terminar(false)
             default: break
             }
         }
-        c.start(queue: .global())
-        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
-            guard !respondido else { return }
-            respondido = true; c.cancel(); completa(false)
-        }
-    }
-
-    private static func probarUDP(ip: String, puerto: UInt16,
-                                  completa: @escaping (Bool) -> Void) {
-        guard let p = NWEndpoint.Port(rawValue: puerto) else { return completa(false) }
-        let params = NWParameters.udp
-        params.prohibitedInterfaceTypes = [.cellular]
-        let c = NWConnection(host: NWEndpoint.Host(ip), port: p, using: params)
-        var respondido = false
-
-        func terminar(_ ok: Bool) {
-            guard !respondido else { return }
-            respondido = true
-            c.cancel()
-            completa(ok)
-        }
-
-        c.stateUpdateHandler = { estado in
-            if case .ready = estado {
-                let sonda = "{\"t\":\"m\",\"ses\":999999,\"s\":1,\"tm\":0,\"x\":0,\"y\":0," +
-                            "\"sx\":0,\"sy\":0,\"b\":0,\"ci\":0,\"cb\":\"l\",\"p\":1}"
-                c.send(content: sonda.data(using: .utf8), completion: .idempotent)
-                c.receiveMessage { datos, _, _, _ in
-                    let ok = datos.flatMap { String(data: $0, encoding: .utf8) }?
-                        .contains("pong") ?? false
-                    terminar(ok)
-                }
-            }
-            if case .failed = estado { terminar(false) }
-        }
-        c.start(queue: .global())
-        DispatchQueue.global().asyncAfter(deadline: .now() + 3) { terminar(false) }
+        c.start(queue: cola)
+        cola.asyncAfter(deadline: .now() + 3) { terminar(false) }
     }
 }
 

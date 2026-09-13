@@ -84,7 +84,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(alFondo),
-            name: UIApplication.didEnterBackgroundNotification, object: nil)
+            name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(alFrente),
             name: UIApplication.didBecomeActiveNotification, object: nil)
@@ -112,10 +112,10 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
                              width: a - 16, height: altoBarra)
 
         let ancho = Ajustes.compartidos.franjaScroll ? trackpad.bounds.width * 0.14 : 0
-        franja.frame = CGRect(x: trackpad.bounds.width - ancho, y: 0,
+        franja.frame = CGRect(x: Ajustes.compartidos.franjaIzquierda ? 0 : trackpad.bounds.width - ancho, y: 0,
                               width: ancho, height: trackpad.bounds.height)
         franja.isHidden = ancho == 0
-        registro.frame = CGRect(x: 12, y: 10, width: trackpad.bounds.width - ancho - 24, height: 16)
+        registro.frame = CGRect(x: 12 + (Ajustes.compartidos.franjaIzquierda ? ancho : 0), y: 10, width: trackpad.bounds.width - ancho - 24, height: 16)
         oscurecedor.frame = view.bounds
     }
 
@@ -148,9 +148,11 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         trackpad.reiniciar()
         enlace.soltarTodo()
         golpecito.parar()
+        volumen.parar()
     }
 
     @objc private func alFrente() {
+        guard presentedViewController == nil else { return }
         // Al bloquear el móvil iOS suspende la app y la conexión se queda
         // muerta: hay que rehacerla, no basta con volver a primer plano.
         let a = Ajustes.compartidos
@@ -213,9 +215,8 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
         permiso.pedir()
         hud.text = "probando \(a.ip)..."
         Diagnostico.probar(ip: a.ip, puertoUDP: UInt16(a.puerto)) { [weak self] r in
-            let titulo = (r.tcp && r.udp) ? "Conectado" : "No llega al PC"
+            let titulo = r.udp ? "Conectado" : "No llega al PC"
             let cuerpo = """
-            TCP 8787: \(r.tcp ? "responde" : "nada")
             UDP \(a.puerto): \(r.udp ? "responde" : "nada")
 
             \(r.detalle)
@@ -233,6 +234,7 @@ final class PantallaPrincipal: UIViewController, TrackpadDelegado {
     }
 
     @objc private func abrirAjustes() {
+        alFondo()
         let p = PantallaAjustes()
         p.alCerrar = { [weak self] in
             guard let self else { return }

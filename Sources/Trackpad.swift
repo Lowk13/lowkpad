@@ -37,6 +37,7 @@ final class Trackpad: UIView {
     private var recorrido: Double = 0
     private var enFranja = false
     private var gemelo = false
+    private var huboSecundario = false
     private var modoScroll = false
     private var apretando = false
     private var baseHuella: Double = 0
@@ -82,22 +83,24 @@ final class Trackpad: UIView {
                 ultimoInstante = ahora
                 recorrido = 0
                 gemelo = false
+                huboSecundario = false
                 apretando = false
                 muestrasHuella.removeAll()
                 baseHuella = 0
-                enFranja = ultimoPunto.x > bounds.width - anchoFranja
+                enFranja = anchoFranja > 0 && (a.franjaIzquierda
+                    ? ultimoPunto.x < anchoFranja : ultimoPunto.x > bounds.width - anchoFranja)
 
                 if enFranja { modoScroll = true }
 
                 // tap y medio: tocar y, en el segundo toque, no levantar = arrastrar
-                if a.tocarClic, ahora - ultimoTap < 0.32,
+                if a.tocarClic, !enFranja, ahora - ultimoTap < 0.32,
                    hypot(ultimoPunto.x - ultimoTapPunto.x, ultimoPunto.y - ultimoTapPunto.y) < 40 {
                     arrastrandoPorTap = true
                     delegado?.trackpadBoton("l", pulsado: true)
                     delegado?.trackpadNota("arrastrando (tap y medio)", derecho: false)
                 }
 
-                if a.mantenerDerecho {
+                if a.mantenerDerecho, !enFranja {
                     let tarea = DispatchWorkItem { [weak self] in
                         guard let self, self.principal != nil, self.recorrido < self.umbralMov,
                               !self.arrastrandoPorTap, self.secundarios.isEmpty else { return }
@@ -109,6 +112,7 @@ final class Trackpad: UIView {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.62, execute: tarea)
                 }
             } else {
+                huboSecundario = true
                 var s = Secundario(inicio: ahora, origen: t.location(in: self))
                 tareaLarga?.cancel()
 
@@ -142,10 +146,16 @@ final class Trackpad: UIView {
 
         for t in touches {
             if t === principal {
-                let p = t.location(in: self)
-                dx += Double(p.x - ultimoPunto.x)
-                dy += Double(p.y - ultimoPunto.y)
-                ultimoPunto = p
+                // Recuperar la trayectoria real sin crear una ráfaga de paquetes
+                // con marcas de tiempo idénticas para muestras ya antiguas.
+                for muestra in event?.coalescedTouches(for: t) ?? [t] {
+                    let p = muestra.location(in: self)
+                    let mx = Double(p.x - ultimoPunto.x)
+                    let my = Double(p.y - ultimoPunto.y)
+                    dx += mx; dy += my
+                    recorrido += hypot(mx, my)
+                    ultimoPunto = p
+                }
                 huboPrincipal = true
                 medirHuella(t)
             } else if var s = secundarios[ObjectIdentifier(t)] {
@@ -160,14 +170,14 @@ final class Trackpad: UIView {
 
         guard huboPrincipal else { return }
 
-        recorrido += (dx * dx + dy * dy).squareRoot()
         if recorrido > umbralMov { tareaLarga?.cancel() }
 
         // Solo se entra en scroll si hay dos dedos Y movimiento real, y ninguno
         // de ellos está haciendo de botón.
         if !modoScroll, !enFranja, !secundarios.isEmpty, recorrido > umbralMov {
             let alguienDeBoton = secundarios.values.contains { $0.arrastre }
-            if !alguienDeBoton {
+            if !alguienDeBoton && (gemelo || secundarios.values.contains { $0.movido }) {
+                secundarios.values.forEach { $0.tarea?.cancel() }
                 modoScroll = true
                 delegado?.trackpadNota("scroll con dos dedos", derecho: false)
             }
@@ -185,14 +195,15 @@ final class Trackpad: UIView {
         terminar(touches)
     }
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        terminar(touches)
+        reiniciar()
     }
 
     private func terminar(_ touches: Set<UITouch>) {
         let a = Ajustes.compartidos
         let ahora = CFAbsoluteTimeGetCurrent()
 
-        for t in touches {
+        // Procesar primero el dedo principal hace determinista el final simultáneo.
+        for t in touches.sorted(by: { ($0 === principal ? 0 : 1) < ($1 === principal ? 0 : 1) }) {
             if t === principal {
                 tareaLarga?.cancel()
                 let dur = ahora - inicioPrincipal
@@ -205,7 +216,7 @@ final class Trackpad: UIView {
                     apretando = false
                     delegado?.trackpadBoton("l", pulsado: false)
                 } else if a.tocarClic, recorrido < umbralMov, !enFranja,
-                          dur < msTap, !gemelo, secundarios.isEmpty {
+                          dur < msTap, !gemelo, !huboSecundario, secundarios.isEmpty {
                     delegado?.trackpadClic("l")
                     delegado?.trackpadNota("clic izquierdo · toque", derecho: false)
                     ultimoTap = ahora
@@ -223,7 +234,7 @@ final class Trackpad: UIView {
                 if s.arrastre {
                     delegado?.trackpadBoton("l", pulsado: false)
                     delegado?.trackpadNota("fin de arrastre", derecho: false)
-                } else if !s.movido, dur < msSegundo {
+                } else if !s.movido, !modoScroll, dur < msSegundo {
                     if gemelo, a.dosDedosDerecho {
                         delegado?.trackpadClic("r")
                         delegado?.trackpadNota("clic DERECHO · dos dedos", derecho: true)
@@ -292,6 +303,7 @@ final class Trackpad: UIView {
 
     /// Al irse la app a segundo plano hay que soltarlo todo.
     func reiniciar() {
+        delegado?.trackpadBoton("l", pulsado: false)
         tareaLarga?.cancel()
         secundarios.values.forEach { $0.tarea?.cancel() }
         secundarios.removeAll()
@@ -300,5 +312,8 @@ final class Trackpad: UIView {
         arrastrandoPorTap = false
         apretando = false
         gemelo = false
+        huboSecundario = false
+        enFranja = false
+        ultimoTap = 0
     }
 }

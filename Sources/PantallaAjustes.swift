@@ -110,6 +110,7 @@ final class PantallaAjustes: UIViewController {
         }
         interruptor("Dirección natural", { self.a.scrollNatural }, { self.a.scrollNatural = $0 })
         interruptor("Franja de scroll (borde derecho)", { self.a.franjaScroll }, { self.a.franjaScroll = $0 })
+        interruptor("Franja en el borde izquierdo", { self.a.franjaIzquierda }, { self.a.franjaIzquierda = $0 })
         nota("La franja es para usarlo a una mano: el pulgar no llega a hacer el gesto de dos dedos.")
 
         titulo("Clic a una mano")
