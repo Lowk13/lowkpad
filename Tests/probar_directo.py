@@ -29,12 +29,23 @@ def request(op,**args):
     s.sendall((json.dumps(dict(token=token,op=op,**args),ensure_ascii=False)+'\n').encode())
     return json.loads(reader.readline())
 def send(op,**args):
+    # Nunca dirigir texto o atajos a la ventana del usuario si pierde el foco.
+    assert op == 'status' or u.GetForegroundWindow()==hwnd, 'La ventana de prueba ha perdido el foco'
     f=pool.submit(request,op,**args)
     while not f.done():pump(.005)
     value=f.result();assert value['ok'],value.get('error');pump()
     return value
 try:
-    pump(.3);root.focus_force();editor.focus_set();pump(.1)
+    pump(.3)
+    # Windows puede rechazar focus_force cuando el proceso arranca desde otra app.
+    # Compartir temporalmente la cola de foco no escribe ni pulsa teclas en ella.
+    actual=u.GetWindowThreadProcessId(u.GetForegroundWindow(),None)
+    propio=c.windll.kernel32.GetCurrentThreadId()
+    unido=bool(actual and actual!=propio and u.AttachThreadInput(propio,actual,True))
+    try:
+        root.lift();u.SetForegroundWindow(hwnd);root.focus_force();editor.focus_set();pump(.1)
+    finally:
+        if unido:u.AttachThreadInput(propio,actual,False)
     check('Ventana de prueba enfocada',u.GetForegroundWindow()==hwnd)
     send('status')
     written=''

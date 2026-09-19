@@ -4,6 +4,7 @@ DerivedData/
 Payload/
 *.ipa
 .DS_Store
+__pycache__/
 
 Host/target/
 *.key
