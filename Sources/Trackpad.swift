@@ -22,6 +22,19 @@ final class Trackpad: UIView {
 
     weak var delegado: TrackpadDelegado?
 
+    /// Los botones visibles y el bloqueo de arrastre pertenecen al controlador.
+    /// Mientras están pulsados esta superficie sirve únicamente para apuntar.
+    var botonExternoPulsado = false {
+        didSet {
+            guard botonExternoPulsado != oldValue else { return }
+            cancelarReconocedores()
+            modoScroll = false
+            enFranja = false
+            ultimoTap = 0
+            if principal != nil { soloPuntero = true }
+        }
+    }
+
     private struct Secundario {
         var inicio: CFAbsoluteTime
         var origen: CGPoint
@@ -46,6 +59,11 @@ final class Trackpad: UIView {
     private var radioMax: Double = 0
 
     private var secundarios: [ObjectIdentifier: Secundario] = [:]
+    private var dedosActivos: Set<ObjectIdentifier> = []
+    private var esperandoLevantar = false
+    private var soloPuntero = false
+    private var botonInternoPulsado = false
+    private var recorridoConSecundario = 0.0
     private var tareaLarga: DispatchWorkItem?
 
     private var ultimoTap: CFAbsoluteTime = 0
@@ -66,7 +84,31 @@ final class Trackpad: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private var anchoFranja: CGFloat {
-        Ajustes.compartidos.franjaScroll ? bounds.width * 0.14 : 0
+        Ajustes.compartidos.anchoFranja(en: bounds.width)
+    }
+
+    private var hayArrastre: Bool {
+        arrastrandoPorTap || apretando || secundarios.values.contains { $0.arrastre }
+    }
+
+    /// Agrega las fuentes internas: terminar una no puede soltar otra activa.
+    private func actualizarBotonInterno() {
+        let pulsado = hayArrastre
+        guard pulsado != botonInternoPulsado else { return }
+        botonInternoPulsado = pulsado
+        delegado?.trackpadBoton("l", pulsado: pulsado)
+    }
+
+    private func cancelarReconocedores() {
+        tareaLarga?.cancel()
+        tareaLarga = nil
+        arrastrandoPorTap = false
+        apretando = false
+        for id in Array(secundarios.keys) {
+            secundarios[id]?.tarea?.cancel()
+            secundarios[id]?.arrastre = false
+        }
+        actualizarBotonInterno()
     }
 
     // MARK: - dedos
@@ -75,7 +117,9 @@ final class Trackpad: UIView {
         let a = Ajustes.compartidos
         let ahora = CFAbsoluteTimeGetCurrent()
 
-        for t in touches {
+        for t in touches.sorted(by: { $0.timestamp < $1.timestamp }) {
+            dedosActivos.insert(ObjectIdentifier(t))
+            guard !esperandoLevantar else { continue }
             if principal == nil {
                 principal = t
                 inicioPrincipal = ahora
@@ -87,23 +131,26 @@ final class Trackpad: UIView {
                 apretando = false
                 muestrasHuella.removeAll()
                 baseHuella = 0
-                enFranja = anchoFranja > 0 && (a.franjaIzquierda
+                soloPuntero = botonExternoPulsado
+                modoScroll = false
+                enFranja = !soloPuntero && anchoFranja > 0 && (a.scrollALaIzquierda
                     ? ultimoPunto.x < anchoFranja : ultimoPunto.x > bounds.width - anchoFranja)
 
                 if enFranja { modoScroll = true }
 
                 // tap y medio: tocar y, en el segundo toque, no levantar = arrastrar
-                if a.tocarClic, !enFranja, ahora - ultimoTap < 0.32,
+                if a.tocarClic, !soloPuntero, !enFranja, ahora - ultimoTap < 0.32,
                    hypot(ultimoPunto.x - ultimoTapPunto.x, ultimoPunto.y - ultimoTapPunto.y) < 40 {
                     arrastrandoPorTap = true
-                    delegado?.trackpadBoton("l", pulsado: true)
+                    actualizarBotonInterno()
                     delegado?.trackpadNota("arrastrando (tap y medio)", derecho: false)
                 }
 
-                if a.mantenerDerecho, !enFranja {
+                if a.mantenerDerecho, !soloPuntero, !enFranja {
                     let tarea = DispatchWorkItem { [weak self] in
                         guard let self, self.principal != nil, self.recorrido < self.umbralMov,
-                              !self.arrastrandoPorTap, self.secundarios.isEmpty else { return }
+                              !self.hayArrastre, !self.soloPuntero, !self.esperandoLevantar,
+                              self.secundarios.isEmpty else { return }
                         self.delegado?.trackpadClic("r")
                         self.delegado?.trackpadNota("clic DERECHO · mantener", derecho: true)
                         self.recorrido = self.umbralMov + 1   // que no cuente además como toque
@@ -113,23 +160,34 @@ final class Trackpad: UIView {
                 }
             } else {
                 huboSecundario = true
+                ultimoTap = 0
+                guard secundarios.isEmpty else {
+                    // Tres contactos no son un gesto: impedir clics repetidos y
+                    // esperar a que todos se levanten antes de volver a reconocer.
+                    esperandoLevantar = true
+                    cancelarReconocedores()
+                    continue
+                }
                 var s = Secundario(inicio: ahora, origen: t.location(in: self))
                 tareaLarga?.cancel()
+                recorridoConSecundario = 0
 
                 if secundarios.isEmpty, recorrido < umbralMov, ahora - inicioPrincipal < 0.12 {
                     gemelo = true
                 }
 
                 // segundo dedo apoyado y quieto = botón pulsado mientras siga ahí
-                if a.segundoDedo, !gemelo {
+                if a.segundoDedo, !gemelo, !soloPuntero, !enFranja, !hayArrastre {
                     let id = ObjectIdentifier(t)
                     let tarea = DispatchWorkItem { [weak self] in
                         guard let self, var sec = self.secundarios[id],
-                              !sec.movido, self.principal != nil else { return }
+                              !sec.movido, self.principal != nil, !self.modoScroll,
+                              !self.soloPuntero, !self.esperandoLevantar,
+                              !self.botonExternoPulsado, !self.hayArrastre else { return }
                         sec.arrastre = true
                         self.secundarios[id] = sec
                         self.modoScroll = false
-                        self.delegado?.trackpadBoton("l", pulsado: true)
+                        self.actualizarBotonInterno()
                         self.delegado?.trackpadNota("arrastrando (segundo dedo)", derecho: false)
                     }
                     s.tarea = tarea
@@ -141,6 +199,7 @@ final class Trackpad: UIView {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !esperandoLevantar else { return }
         let ahora = CFAbsoluteTimeGetCurrent()
         var dx = 0.0, dy = 0.0, huboPrincipal = false
 
@@ -154,6 +213,7 @@ final class Trackpad: UIView {
                     let my = Double(p.y - ultimoPunto.y)
                     dx += mx; dy += my
                     recorrido += hypot(mx, my)
+                    if !secundarios.isEmpty { recorridoConSecundario += hypot(mx, my) }
                     ultimoPunto = p
                 }
                 huboPrincipal = true
@@ -174,11 +234,12 @@ final class Trackpad: UIView {
 
         // Solo se entra en scroll si hay dos dedos Y movimiento real, y ninguno
         // de ellos está haciendo de botón.
-        if !modoScroll, !enFranja, !secundarios.isEmpty, recorrido > umbralMov {
-            let alguienDeBoton = secundarios.values.contains { $0.arrastre }
-            if !alguienDeBoton && (gemelo || secundarios.values.contains { $0.movido }) {
+        if !modoScroll, !enFranja, !soloPuntero, !hayArrastre,
+           !secundarios.isEmpty, recorridoConSecundario > umbralMov {
+            if gemelo || secundarios.values.contains(where: { $0.movido }) {
                 secundarios.values.forEach { $0.tarea?.cancel() }
                 modoScroll = true
+                ultimoTap = 0
                 delegado?.trackpadNota("scroll con dos dedos", derecho: false)
             }
         }
@@ -186,6 +247,11 @@ final class Trackpad: UIView {
         ultimoInstante = ahora
         if modoScroll {
             delegado?.trackpadScroll(dx: enFranja ? 0 : dx, dy: dy)
+        } else if !soloPuntero, !hayArrastre, !secundarios.isEmpty,
+                  gemelo || secundarios.values.contains(where: { $0.movido }) {
+            // La zona muerta decide entre clic de dos dedos y scroll sin mover
+            // antes el cursor por debajo de aquello que se quería seleccionar.
+            return
         } else {
             delegado?.trackpadMovio(dx: dx, dy: dy)
         }
@@ -195,12 +261,34 @@ final class Trackpad: UIView {
         terminar(touches)
     }
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        reiniciar()
+        cancelarReconocedores()
+        secundarios.removeAll()
+        principal = nil
+        modoScroll = false
+        enFranja = false
+        ultimoTap = 0
+        for t in touches { dedosActivos.remove(ObjectIdentifier(t)) }
+        // UIKit puede cancelar solo una parte de los contactos. Los restantes
+        // no deben convertirse en un gesto nuevo sin haberse levantado antes.
+        esperandoLevantar = !dedosActivos.isEmpty
     }
 
     private func terminar(_ touches: Set<UITouch>) {
         let a = Ajustes.compartidos
         let ahora = CFAbsoluteTimeGetCurrent()
+
+        // Resolver el toque con dos dedos una sola vez, al levantar el primero.
+        // Da igual si UIKit entrega los finales juntos o en callbacks distintos.
+        let terminaReconocido = touches.contains { $0 === principal || secundarios[ObjectIdentifier($0)] != nil }
+        if terminaReconocido, gemelo, a.dosDedosDerecho, !esperandoLevantar,
+           !soloPuntero, !modoScroll, !hayArrastre, recorrido < umbralMov,
+           ahora - inicioPrincipal < msSegundo,
+           let s = secundarios.values.first, !s.movido, ahora - s.inicio < msSegundo {
+            delegado?.trackpadClic("r")
+            delegado?.trackpadNota("clic DERECHO · dos dedos", derecho: true)
+            esperandoLevantar = true
+            ultimoTap = 0
+        }
 
         // Procesar primero el dedo principal hace determinista el final simultáneo.
         for t in touches.sorted(by: { ($0 === principal ? 0 : 1) < ($1 === principal ? 0 : 1) }) {
@@ -208,14 +296,10 @@ final class Trackpad: UIView {
                 tareaLarga?.cancel()
                 let dur = ahora - inicioPrincipal
 
-                if arrastrandoPorTap {
-                    arrastrandoPorTap = false
-                    delegado?.trackpadBoton("l", pulsado: false)
+                if hayArrastre {
                     delegado?.trackpadNota("fin de arrastre", derecho: false)
-                } else if apretando {
-                    apretando = false
-                    delegado?.trackpadBoton("l", pulsado: false)
-                } else if a.tocarClic, recorrido < umbralMov, !enFranja,
+                } else if a.tocarClic, !soloPuntero, !esperandoLevantar, !modoScroll,
+                          recorrido < umbralMov, !enFranja,
                           dur < msTap, !gemelo, !huboSecundario, secundarios.isEmpty {
                     delegado?.trackpadClic("l")
                     delegado?.trackpadNota("clic izquierdo · toque", derecho: false)
@@ -223,31 +307,39 @@ final class Trackpad: UIView {
                     ultimoTapPunto = ultimoPunto
                 }
 
+                cancelarReconocedores()
                 principal = nil
                 enFranja = false
-                if secundarios.isEmpty { modoScroll = false }
+                esperandoLevantar = true
 
             } else if let s = secundarios.removeValue(forKey: ObjectIdentifier(t)) {
                 s.tarea?.cancel()
                 let dur = ahora - s.inicio
 
                 if s.arrastre {
-                    delegado?.trackpadBoton("l", pulsado: false)
+                    actualizarBotonInterno()
                     delegado?.trackpadNota("fin de arrastre", derecho: false)
-                } else if !s.movido, !modoScroll, dur < msSegundo {
-                    if gemelo, a.dosDedosDerecho {
-                        delegado?.trackpadClic("r")
-                        delegado?.trackpadNota("clic DERECHO · dos dedos", derecho: true)
-                    } else if principal != nil, a.segundoDedo {
+                } else if !s.movido, !modoScroll, !soloPuntero, !esperandoLevantar,
+                          !hayArrastre, !gemelo, dur < msSegundo {
+                    if principal != nil, a.segundoDedo {
                         delegado?.trackpadClic("l")
                         delegado?.trackpadNota("clic izquierdo · segundo dedo", derecho: false)
                     }
                 }
-                if secundarios.isEmpty {
-                    gemelo = false
-                    if principal == nil || !enFranja { modoScroll = false }
-                }
+                if modoScroll { esperandoLevantar = true }
+                gemelo = false
             }
+            dedosActivos.remove(ObjectIdentifier(t))
+        }
+        if dedosActivos.isEmpty {
+            cancelarReconocedores()
+            secundarios.removeAll()
+            principal = nil
+            modoScroll = false
+            esperandoLevantar = false
+            soloPuntero = false
+            gemelo = false
+            enFranja = false
         }
     }
 
@@ -278,7 +370,8 @@ final class Trackpad: UIView {
         if r > radioMax { radioMax = r }
         delegado?.trackpadHuella(r, base: baseHuella, minimo: radioMin, maximo: radioMax)
 
-        guard Ajustes.compartidos.presion else { return }
+        guard Ajustes.compartidos.presion, !soloPuntero, !modoScroll,
+              !arrastrandoPorTap, secundarios.isEmpty else { return }
         muestrasHuella.append(r)
         guard muestrasHuella.count > 4 else { return }
 
@@ -286,11 +379,11 @@ final class Trackpad: UIView {
         let a = Ajustes.compartidos
         if !apretando, ratio >= a.presionAbajo {
             apretando = true
-            delegado?.trackpadBoton("l", pulsado: true)
+            actualizarBotonInterno()
             delegado?.trackpadNota("clic · pulgar apoyado", derecho: false)
         } else if apretando, ratio <= a.presionArriba {
             apretando = false
-            delegado?.trackpadBoton("l", pulsado: false)
+            actualizarBotonInterno()
         }
     }
 
@@ -303,10 +396,9 @@ final class Trackpad: UIView {
 
     /// Al irse la app a segundo plano hay que soltarlo todo.
     func reiniciar() {
-        delegado?.trackpadBoton("l", pulsado: false)
-        tareaLarga?.cancel()
-        secundarios.values.forEach { $0.tarea?.cancel() }
+        cancelarReconocedores()
         secundarios.removeAll()
+        dedosActivos.removeAll()
         principal = nil
         modoScroll = false
         arrastrandoPorTap = false
@@ -314,6 +406,8 @@ final class Trackpad: UIView {
         gemelo = false
         huboSecundario = false
         enFranja = false
+        esperandoLevantar = false
+        soloPuntero = false
         ultimoTap = 0
     }
 }

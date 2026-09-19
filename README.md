@@ -2,23 +2,24 @@
 
 Usar el iPhone como ratón del PC. App de iOS + un programa pequeño que corre en Windows.
 
-Esta versión es un **banco de pruebas**: sirve para decidir, probándolo en el sofá y en la
-cama, cuál de las formas de hacer clic es la buena. Casi todo se ajusta desde el propio móvil
-a propósito, para no tener que recompilar por cada cambio de un número.
+La versión **0.5.0** incorpora posiciones y tamaños para probar qué resulta más cómodo en la
+mesa, el sofá o la cama. El selector ofrece **Mesa, Mano derecha y Mano izquierda**, con alturas
+**Compacta, Media y Amplia** y distribución adaptada a vertical y horizontal. Las decisiones y
+sus fuentes están en [Ergonomía](docs/ERGONOMIA.md); los cambios de esta versión, en las
+[notas de la actualización](docs/PATCH_NOTES_0.5.0.md).
 
 ## Por qué existe
 
-Las apps de este tipo que hay por ahí van por TCP, que retransmite los paquetes perdidos y
-provoca tirones; no dejan configurar la aceleración por separado de la velocidad; y para hacer
-clic te obligan a levantar el dedo o a darle a un botón en la pantalla. Aquí:
+LowkPad permite ajustar por separado el movimiento, los gestos y la disposición. Utiliza UDP
+para el ratón y TCP para teclado y paneles, según las necesidades de cada tipo de entrada:
 
 - **UDP con estado acumulado.** Cada paquete lleva el total recorrido, no el incremento. Si uno
-  se pierde, el siguiente ya trae la cuenta correcta: el hueco se cierra solo, sin retransmitir
-  y sin saltos. Probado tirando el 60 % de los paquetes a propósito: el cursor acaba exactamente
-  en el mismo sitio.
-- **El tráfico va marcado como voz interactiva**, así el Wi-Fi lo mete en su cola prioritaria.
-- **Un latido constante** impide que la radio del iPhone entre en ahorro de energía, que es lo
-  que hace que el primer movimiento tras una pausa llegue tarde.
+  se pierde, el siguiente informa del recorrido acumulado. Esto permite recuperar movimiento
+  sin retransmitir cada muestra; no garantiza una trayectoria visual idéntica ante pérdidas.
+- **El tráfico solicita prioridad de voz interactiva.** La prioridad efectiva depende de iOS,
+  la red y el router; la marca no garantiza una cola Wi-Fi concreta ni menor latencia.
+- **Un latido periódico** permite supervisar el enlace y mantener tráfico durante las pausas.
+  No garantiza que la radio del iPhone permanezca activa ni evita toda demora al reanudar.
 - **Velocidad y aceleración independientes**: `salida = entrada × ganancia × f(velocidad)`, con
   `f = 1` cuando la aceleración está apagada. Apagarla no te cambia la sensibilidad base.
 - **El PC mantiene su propia posición del cursor y la escribe en absoluto**, para saltarse la
@@ -26,37 +27,46 @@ clic te obligan a levantar el dedo o a darle a un botón en la pantalla. Aquí:
 
 ## Cómo hacer clic
 
-Pensado para usarlo **a una mano** (tumbado, en el sofá) y **sin mirar el móvil**, con la vista
-puesta en el monitor. De ahí que todo lleve vibración: es la única forma de saber que has hecho
-clic sin mirar.
+Se puede usar con una mano o apoyado en la mesa. Los controles visibles y la respuesta háptica
+complementan los gestos; la vibración se puede desactivar.
 
 | Método | Para qué agarre |
 |---|---|
-| **Golpecito en la trasera** (acelerómetro) | Una mano. El pulgar apunta y no se levanta; el índice golpea por detrás. |
+| **Clic y Derecho** | Botones visibles; permiten mantener pulsado mientras se mueve el cursor. |
+| **Arrastrar / Soltar** | Bloquea el clic primario para levantar y recolocar el pulgar durante un arrastre. |
+| **Golpecito en la trasera** (acelerómetro) | Opción experimental a una mano. Desactivada en instalaciones nuevas; se respeta la preferencia existente. |
 | **Segundo dedo** | Dos manos. Toque = clic; dedo apoyado = botón pulsado, para arrastrar sin levantar nada. |
 | **Tocar / tap y medio** | Cualquiera. El clásico. |
-| **Barra inferior** | Dos manos. |
-| **Presión por huella** | Experimento. En Safari este dato venía fijo; aquí se lee de otra fuente. |
+| **Presión por huella** | Experimento desactivado: el cambio de contacto puede desplazar el cursor al pulsar. |
+
+**Precisión** reduce temporalmente el movimiento enviado a ×0,35. No desactiva la aceleración
+del host: al reducir la entrada también disminuye su velocidad estimada. La franja lateral de
+scroll mide entre 44 y 64 puntos según el espacio y cambia de lado con el perfil. Se conserva
+el scroll con dos dedos, sin añadir inercia. Los valores iniciales deben probarse en el iPhone.
+
+Cambiar de postura no intercambia los botones izquierdo y derecho. El arrastre se libera al
+abandonar el contexto de control, y el host conserva su protección ante una conexión perdida.
 
 ## Instalar
 
-1. En el PC: abrir `lowkpad-host.exe` (servidor Rust, UDP 8788).
+1. En el PC: abrir `lowkpad-host.exe` (servidor Rust, ratón UDP 8788 y paneles TCP 8787).
 2. Descargar `LowkPad.ipa` de la
    [última compilación](../../releases/tag/ultima) **desde el propio iPhone**.
 3. Abrirlo con **LiveContainer**.
-4. En la app, «ajustes» → poner la IP del PC.
+4. En la app, «ajustes» → poner la IP del PC y la clave de enlace para los paneles.
+
+La app 0.5.0 es compatible con el host 0.4.0. Al actualizar se conserva la misma IP y clave.
 
 ## Compilar
 
-Se compila solo en GitHub Actions (runner de macOS). Al ser un repositorio público, esos
-runners son gratis y sin límite de minutos. Se lanza a mano desde la pestaña **Actions** →
+Se compila en GitHub Actions (runner de macOS). Se lanza a mano desde la pestaña **Actions** →
 *Compilar LowkPad* → *Run workflow*, o simplemente subiendo un cambio.
 
 No se firma nada: LiveContainer no lo necesita.
 
 ## Qué falta
 
-El emparejado por QR, el cifrado de extremo a extremo y los accesos directos/scripts.
+El emparejado por QR, el cifrado de extremo a extremo y los atajos o scripts personalizados.
 
 
 ## Revisión 0.2.0 (13/09/2026)

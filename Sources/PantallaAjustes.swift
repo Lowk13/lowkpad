@@ -120,9 +120,9 @@ final class PantallaAjustes: UIViewController {
             String(format: "%.1fx", $0)
         }
         interruptor("Dirección natural", { self.a.scrollNatural }, { self.a.scrollNatural = $0 })
-        interruptor("Franja de scroll (borde derecho)", { self.a.franjaScroll }, { self.a.franjaScroll = $0 })
-        interruptor("Franja en el borde izquierdo", { self.a.franjaIzquierda }, { self.a.franjaIzquierda = $0 })
-        nota("La franja es para usarlo a una mano: el pulgar no llega a hacer el gesto de dos dedos.")
+        interruptor("Franja lateral de scroll", { self.a.franjaScroll }, { self.a.franjaScroll = $0 })
+        interruptor("Franja a la izquierda en modo Mesa", { self.a.franjaIzquierda }, { self.a.franjaIzquierda = $0 })
+        nota("En los modos Mano derecha y Mano izquierda, la franja se coloca junto al pulgar. Elige la postura y la altura desde el botón Mesa / Derecha / Izquierda de la pantalla principal.")
 
         titulo("Clic a una mano")
         interruptor("Golpecito en la trasera", { self.a.golpecito }, { self.a.golpecito = $0 })
@@ -130,15 +130,12 @@ final class PantallaAjustes: UIViewController {
             String(format: "%.2f", $0)
         }
         interruptor("· que sea clic derecho", { self.a.golpeDerecho }, { self.a.golpeDerecho = $0 })
-        nota("Ahora detecta lo BRUSCO del golpe, no lo fuerte: sujetando el móvil con una mano, "
-             + "tu propia mano amortigua el golpe y por fuerza nunca llegaba. En la pantalla principal "
-             + "sale «tiron» con el pico. Da un golpecito flojito, mira qué marca y pon el umbral "
-             + "algo por debajo.")
+        nota("Opcional: un golpe suave por detrás hace clic sin levantar el pulgar. Detecta brusquedad, no fuerza. Si recolocar el móvil produce clics involuntarios, aumenta el umbral o desactívalo.")
 
         titulo("Clic en la pantalla")
         interruptor("Tocar para hacer clic", { self.a.tocarClic }, { self.a.tocarClic = $0 })
         interruptor("Segundo dedo = clic", { self.a.segundoDedo }, { self.a.segundoDedo = $0 })
-        interruptor("Barra de clic abajo", { self.a.barraClic }, { self.a.barraClic = $0 })
+        interruptor("Botones de clic visibles", { self.a.botonesVisibles }, { self.a.botonesVisibles = $0 })
         interruptor("Mantener = clic derecho", { self.a.mantenerDerecho }, { self.a.mantenerDerecho = $0 })
         interruptor("Dos dedos = clic derecho", { self.a.dosDedosDerecho }, { self.a.dosDedosDerecho = $0 })
         nota("Si dejas el segundo dedo apoyado, el botón se queda pulsado: así se arrastra sin levantar nada.")

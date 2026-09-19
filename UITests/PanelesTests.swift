@@ -10,7 +10,7 @@ final class PanelesTests: XCTestCase {
     func testPanelesEnPantalla() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = ["-ui-testing", "-reset-ajustes-ui"]
         app.launch()
         let barra = app.scrollViews["barraHerramientas"]
         XCTAssertTrue(barra.waitForExistence(timeout: 10))

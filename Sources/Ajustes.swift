@@ -1,4 +1,37 @@
-import Foundation
+import UIKit
+
+enum DisposicionPad: String, CaseIterable {
+    case mesa, derecha, izquierda
+
+    var titulo: String {
+        switch self {
+        case .mesa: return "Mesa"
+        case .derecha: return "Mano derecha"
+        case .izquierda: return "Mano izquierda"
+        }
+    }
+    var corto: String {
+        switch self {
+        case .mesa: return "Mesa"
+        case .derecha: return "Derecha"
+        case .izquierda: return "Izquierda"
+        }
+    }
+    var icono: String {
+        switch self {
+        case .mesa: return "rectangle.landscape"
+        case .derecha: return "hand.point.up.right"
+        case .izquierda: return "hand.point.up.left"
+        }
+    }
+    var detalle: String {
+        switch self {
+        case .mesa: return "Superficie amplia para el índice o dos manos. También en horizontal."
+        case .derecha: return "Zona más baja, alineada a la derecha, con scroll junto al pulgar."
+        case .izquierda: return "La misma comodidad a la izquierda. Los clics conservan su función."
+        }
+    }
+}
 
 /// Todo lo ajustable, guardado en el propio móvil.
 ///
@@ -46,7 +79,7 @@ final class Ajustes {
     @Guardado(clave: "scrollNatural", porDefecto: false) var scrollNatural: Bool
 
     // --- formas de hacer clic ---
-    @Guardado(clave: "golpecito", porDefecto: true) var golpecito: Bool
+    @Guardado(clave: "golpecito", porDefecto: false) var golpecito: Bool
     @Guardado(clave: "umbralGolpe", porDefecto: 0.35) var umbralGolpe: Double
     @Guardado(clave: "golpeDerecho", porDefecto: false) var golpeDerecho: Bool
     @Guardado(clave: "tocarClic", porDefecto: true) var tocarClic: Bool
@@ -68,4 +101,24 @@ final class Ajustes {
     @Guardado(clave: "franjaScroll", porDefecto: true) var franjaScroll: Bool
     @Guardado(clave: "franjaIzquierda", porDefecto: false) var franjaIzquierda: Bool
     @Guardado(clave: "oscurecer", porDefecto: 0.0) var oscurecer: Double
+
+    // La postura cambia la geometría, nunca la sensibilidad ni el significado del clic.
+    @Guardado(clave: "disposicionPad", porDefecto: "mesa") private var disposicionGuardada: String
+    var disposicion: DisposicionPad {
+        get { DisposicionPad(rawValue: disposicionGuardada) ?? .mesa }
+        set { disposicionGuardada = newValue.rawValue }
+    }
+    @Guardado(clave: "alcancePulgar", porDefecto: 1) var alcancePulgar: Int
+    @Guardado(clave: "botonesVisibles", porDefecto: true) var botonesVisibles: Bool
+
+    var scrollALaIzquierda: Bool {
+        switch disposicion {
+        case .mesa: return franjaIzquierda
+        case .derecha: return false
+        case .izquierda: return true
+        }
+    }
+    func anchoFranja(en ancho: CGFloat) -> CGFloat {
+        franjaScroll ? min(ancho, max(44, min(64, ancho * 0.14))) : 0
+    }
 }
